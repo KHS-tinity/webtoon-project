@@ -1,0 +1,2740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <script>
+        window.addEventListener('error', function(e) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '0';
+            errorDiv.style.left = '0';
+            errorDiv.style.width = '100%';
+            errorDiv.style.backgroundColor = '#ef4444';
+            errorDiv.style.color = '#ffffff';
+            errorDiv.style.padding = '1rem';
+            errorDiv.style.zIndex = '999999';
+            errorDiv.style.fontSize = '14px';
+            errorDiv.style.fontFamily = 'monospace';
+            errorDiv.style.whiteSpace = 'pre-wrap';
+            errorDiv.innerHTML = '<strong>[JS Runtime Error]</strong> ' + e.message + '<br>Line: ' + e.lineno + ' | Col: ' + e.colno + '<br>File: ' + e.filename + (e.error && e.error.stack ? '<br><br>' + e.error.stack.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '');
+            document.body.appendChild(errorDiv);
+        });
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웹툰 사운드디렉터 Pro - 다중 사운드 트랙</title>
+    <script src="viewer.js"></script>
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-color: #f3f4f6;
+            --panel-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            gap: 2rem;
+            max-width: 1300px;
+            width: 100%;
+            background: var(--panel-bg);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            align-items: flex-start;
+        }
+
+        .controls {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding-right: 1rem;
+        }
+        .controls::-webkit-scrollbar { width: 8px; }
+        .controls::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+
+        h1 { font-size: 1.75rem; font-weight: 800; margin: 0; color: var(--text-main); letter-spacing: -0.02em; }
+        
+        /* 탭 UI */
+        .tabs { display: flex; gap: 0.5rem; border-bottom: 2px solid var(--border-color); margin-bottom: 0.5rem; }
+        .tab-btn {
+            background: none; border: none; padding: 0.75rem 1.5rem; font-size: 1.05rem; font-weight: 700; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s;
+        }
+        .tab-btn:hover { color: var(--primary-color); }
+        .tab-btn.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+
+        .tab-content { display: none; flex-direction: column; gap: 1rem; }
+        .tab-content.active { display: flex; }
+
+        .section-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+
+        .card { background: #f9fafb; border: 1px solid var(--border-color); border-radius: 1rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; transition: box-shadow 0.2s, border-color 0.2s; }
+        .card:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-color: #c7d2fe; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.95rem; }
+
+        .btn-small { background: #ef4444; color: white; border: none; border-radius: 0.25rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; cursor: pointer; transition: background 0.2s; }
+        .btn-small:hover { background: #dc2626; }
+        .btn-add { background: #e0e7ff; color: var(--primary-color); border: 1px dashed var(--primary-color); border-radius: 0.5rem; padding: 0.4rem 0.75rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.2s; }
+        .btn-add:hover { background: #c7d2fe; }
+        .btn-add-sfx { background: #fee2e2; color: #ef4444; border-color: #ef4444; }
+        .btn-add-sfx:hover { background: #fecaca; }
+        .btn-add-bgm { background: #dcfce7; color: #22c55e; border-color: #22c55e; }
+        .btn-add-bgm:hover { background: #bbf7d0; }
+
+        .form-row { display: flex; gap: 0.75rem; align-items: center; }
+        .form-row > div { flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+        label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+
+        input[type="text"], input[type="number"], textarea { padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.9rem; width: 100%; box-sizing: border-box; background: #ffffff; transition: border-color 0.2s; font-family: inherit; }
+        input[type="text"]:focus, input[type="number"]:focus, textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+        textarea { resize: vertical; min-height: 60px; }
+        input[type="color"] { border: none; width: 100%; height: 32px; border-radius: 0.5rem; cursor: pointer; padding: 0; background: transparent; }
+        input[type="file"] { font-size: 0.8rem; padding: 0.4rem; border: 1px dashed #a5b4fc; border-radius: 0.5rem; background: #eff6ff; width: 100%; cursor: pointer; }
+
+        .play-btn { padding: 1.25rem 1.5rem; background-color: var(--primary-color); color: white; border: none; border-radius: 0.75rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4); margin-top: 1rem; }
+        .play-btn:hover:not(:disabled) { background-color: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 8px -1px rgba(99, 102, 241, 0.5); }
+        .play-btn:disabled { background-color: #9ca3af; cursor: not-allowed; transform: none; box-shadow: none; }
+        #exportJsonBtn { background: linear-gradient(135deg, #4f46e5, #4338ca); box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4); margin-top: 0.5rem; }
+        #exportJsonBtn:hover:not(:disabled) { background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.5); }
+
+        .preview-wrapper { display: flex; flex-direction: column; align-items: center; gap: 1rem; position: sticky; top: 2rem; }
+        .preview-title { font-size: 0.9rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        .mobile-frame {
+            width: 340px; height: 640px; background-color: #1f2937; border-radius: 2.5rem;
+            box-shadow: 0 0 0 12px #1f2937, 0 20px 25px -5px rgba(0, 0, 0, 0.2); position: relative; overflow: hidden;
+        }
+        .mobile-frame::before { content: ''; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 100px; height: 25px; background-color: #1f2937; border-radius: 1rem; z-index: 100; pointer-events: none; }
+
+        /* 신규 고성능 스냅 스크롤 뷰어 스타일 */
+        .viewer-scroll-container {
+            width: 100%; height: 100%; overflow-y: scroll;
+            scroll-snap-type: y mandatory; scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch; display: flex; flex-direction: column;
+            background-color: #111827;
+        }
+        .viewer-scroll-container::-webkit-scrollbar { display: none; } /* 스크롤바 완전 숨김 */
+
+        .viewer-cut-item {
+            width: 100%; height: 100%; flex-shrink: 0; position: relative;
+            scroll-snap-align: start; overflow: hidden;
+            background-image: linear-gradient(#374151 1px, transparent 1px), linear-gradient(90deg, #374151 1px, transparent 1px);
+            background-size: 20px 20px; background-color: #1f2937;
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+            transition: transform 0.5s ease;
+        }
+        
+        .cut-bg-image, .cut-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-size: cover; background-position: center; background-repeat: no-repeat;
+            pointer-events: none;
+            object-fit: cover; /* WebM 비디오 자동 크기 비례 채우기 대응 */
+        }
+        
+        .cut-bg-image { z-index: 1; }
+
+        /* 컷별 고유 연출 CSS 효과 */
+        /* 1. 페이드 인 */
+        .cut-bg-image.effect-fade, .cut-layer.effect-fade {
+            opacity: 0;
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-fade,
+        .viewer-cut-item.active .cut-layer.effect-fade {
+            opacity: 1;
+        }
+
+        /* 2. 슬라이드 업 */
+        .cut-bg-image.effect-slide-up, .cut-layer.effect-slide-up {
+            transform: translateY(120px);
+            opacity: 0;
+            transition: transform 0.9s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.8s ease;
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-slide-up,
+        .viewer-cut-item.active .cut-layer.effect-slide-up {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* 3. 줌 인 */
+        .cut-bg-image.effect-zoom, .cut-layer.effect-zoom {
+            transform: scale(1.35);
+            opacity: 0;
+            transition: transform 1.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 1s ease;
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-zoom,
+        .viewer-cut-item.active .cut-layer.effect-zoom {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* 4. 화면 흔들림 (Shake) */
+        .viewer-cut-item.effect-shake.active {
+            animation: viewerShake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+
+        @keyframes viewerShake {
+            10%, 90% { transform: translate3d(-3px, -2px, 0); }
+            20%, 80% { transform: translate3d(5px, 4px, 0); }
+            30%, 50%, 70% { transform: translate3d(-10px, 2px, 0); }
+            40%, 60% { transform: translate3d(10px, -4px, 0); }
+        }
+
+        /* 말풍선 공통 */
+        .speech-bubble {
+            position: absolute; max-width: 75%; padding: 0.8rem 1.25rem; border-radius: 1.25rem;
+            font-size: 1.1rem; font-weight: 600; line-height: 1.5; word-break: keep-all;
+            transform: scale(0.6) translateY(20px); opacity: 0; z-index: 10; cursor: grab;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+            color: var(--text-color);
+            background-color: transparent;
+        }
+        .bubble-text-layer { position: relative; z-index: 10; pointer-events: none; white-space: pre-wrap; word-break: break-all; }
+        .bubble-shadow-layer {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; z-index: -2;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); pointer-events: none;
+        }
+        .speech-bubble.selected { z-index: 20; }
+        .speech-bubble.selected .bubble-shadow-layer { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.6), 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .speech-bubble:active { cursor: grabbing; }
+        .speech-bubble.animate { 
+            opacity: 0; 
+            transform: scale(0.6) translateY(20px);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease, left 0.3s ease, top 0.3s ease; 
+        }
+        .speech-bubble .tail-svg,
+        .speech-bubble .bubble-path {
+            transition: opacity 0.4s ease;
+        }
+        .speech-bubble.animate .tail-svg,
+        .speech-bubble.animate .bubble-path {
+            opacity: 0;
+        }
+
+        /* 편집기/초기 상태용 자막 노출 강제 규칙 (Visibility Fix) */
+        .speech-bubble.force-render {
+            transform: scale(1) translateY(0) !important;
+            opacity: 1 !important;
+        }
+        .speech-bubble.force-render .bubble-text-layer {
+            opacity: 1 !important;
+        }
+        .speech-bubble.force-render .typing-wrapper span {
+            display: inline-block !important;
+            opacity: 1 !important;
+        }
+        .speech-bubble.force-render .tail-svg,
+        .speech-bubble.force-render .bubble-path {
+            opacity: 1 !important;
+        }
+
+        .speech-bubble.show { transform: scale(1) translateY(0); opacity: 1; }
+        .speech-bubble.show .tail-svg,
+        .speech-bubble.show .bubble-path {
+            opacity: 1;
+        }
+        .typing-wrapper span { opacity: 0; display: inline; }
+
+        /* SVG 꼬리표 캔버스 */
+        .tail-svg { position: absolute; top: -500px; left: -500px; width: 1000px; height: 1000px; pointer-events: none; z-index: 3; }
+        
+        /* 말꼬리 침투선 가림막 레이어 */
+        .bubble-bg-cover { 
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+            border-radius: inherit; 
+            background-color: var(--bubble-color, #ffffff); 
+            border: 2.5px solid #111827;
+            box-sizing: border-box;
+            z-index: 2; pointer-events: none; 
+        }
+
+        /* 핸들 공통 */
+        .handle { position: absolute; width: 16px; height: 16px; border: 2px solid white; border-radius: 50%; display: none; transform: translate(-50%, -50%); pointer-events: auto; z-index: 30; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: transform 0.1s; }
+        .speech-bubble.selected .handle { display: block; }
+        .handle:hover { transform: translate(-50%, -50%) scale(1.2); }
+        .tip-handle { background: #ef4444; cursor: move; }
+        .base-handle { background: #3b82f6; cursor: pointer; }
+
+        /* 롱프레스 게이지 애니메이션 */
+        @keyframes gaugePulse {
+            0% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 2px rgba(245, 158, 11, 0.4)); }
+            50% { transform: translate(-50%, -50%) scale(1.08); filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8)); }
+            100% { transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 2px rgba(245, 158, 11, 0.4)); }
+        }
+        .width-gauge-container.activated svg {
+            animation: gaugePulse 1.2s infinite ease-in-out;
+        }
+
+        .status-text { font-size: 0.95rem; font-weight: 600; color: var(--primary-color); text-align: center; background: #e0e7ff; padding: 0.5rem; border-radius: 0.5rem; display: none; margin-top: 0.5rem; }
+
+        /* 컷 관리 UI */
+        .cut-management { margin-bottom: 1.5rem; background: #ffffff; padding: 1rem; border-radius: 1rem; border: 1px solid var(--border-color); }
+        .cut-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+        .cut-tab { padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: #f9fafb; color: var(--text-muted); cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
+        .cut-tab:hover { background: #e5e7eb; }
+        .cut-tab.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+
+        .cut-scene-list { display: none; flex-direction: column; gap: 1rem; }
+        .cut-scene-list.active { display: flex; }
+
+        .bubble-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2; pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="controls">
+            <h1>웹툰 종합 사운드 디렉터 <span style="color:var(--primary-color)">Pro</span></h1>
+            
+            <div class="cut-management">
+                <div class="section-title" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+                    <span>컷 관리</span>
+                    <button class="btn-add" id="addCutBtn">+ 컷 추가</button>
+                </div>
+                <div class="cut-tabs" id="cutTabs">
+                    <!-- 동적 생성 -->
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-target="tab-scene">컷 연출 (대사/효과음)</button>
+                <button class="tab-btn" data-target="tab-bgm">글로벌 사운드 (BGM)</button>
+            </div>
+
+            <div id="tab-scene" class="tab-content active">
+                <div class="current-cut-settings card" style="margin-bottom: 1rem; border-color: var(--primary-color); gap: 1rem;">
+                    <!-- 상단 연출 셀렉터 -->
+                    <div class="form-row" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                        <div style="flex: 1.2;">
+                            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-color); display: flex; align-items: center; gap: 0.4rem;">
+                                🎭 컷 레이어 구성 (정지 이미지 및 WebM VP9 애니메이션)
+                            </h3>
+                        </div>
+                        <div style="flex: 0.8; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <label style="color: var(--primary-color); font-weight: 700; display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem;">
+                                ✨ 컷 연출 효과 선택
+                            </label>
+                            <select id="cutEffectSelect" style="padding: 0.4rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.85rem; width: 100%; background: white; transition: border-color 0.2s; font-weight: 600; height: 36px; box-sizing: border-box;">
+                                <option value="none">✨ 기본 (일반 스크롤)</option>
+                                <option value="fade">👁️ 페이드 인 (서서히 등장)</option>
+                                <option value="slide-up">⬆️ 슬라이드 업 (밑에서 위로)</option>
+                                <option value="zoom">🔍 줌 인 (스케일 업 모션)</option>
+                                <option value="shake">💥 화면 흔들림 (충격/액션 효과)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 3중 레이어 업로드 컨트롤러 -->
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <!-- 레이어 1: 캐릭터 -->
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="color: #6366f1; font-weight: 700; font-size: 0.8rem;">👤 레이어 1 (캐릭터 - 최상단)</label>
+                                <button class="btn-small" id="clearLayer1" style="display: none; padding: 1px 6px; font-size: 0.7rem; background: #94a3b8;">삭제</button>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; background: white; border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.25rem 0.5rem; height: 38px; box-sizing: border-box;">
+                                <label for="layer1Upload" style="padding: 0.25rem 0.75rem; background: #6366f1; color: white; border-radius: 0.25rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: background 0.2s; display: inline-flex; align-items: center; gap: 0.25rem; margin: 0; white-space: nowrap;">
+                                    📁 파일 선택
+                                </label>
+                                <span id="layer1Name" style="font-size: 0.8rem; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">선택된 캐릭터 없음 (jpg/png/webm)</span>
+                                <input type="file" accept="image/*,video/webm" id="layer1Upload" style="display: none;">
+                            </div>
+                        </div>
+
+                        <!-- 레이어 2: 소품 -->
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="color: #ef4444; font-weight: 700; font-size: 0.8rem;">🎒 레이어 2 (소품 - 중간)</label>
+                                <button class="btn-small" id="clearLayer2" style="display: none; padding: 1px 6px; font-size: 0.7rem; background: #94a3b8;">삭제</button>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; background: white; border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.25rem 0.5rem; height: 38px; box-sizing: border-box;">
+                                <label for="layer2Upload" style="padding: 0.25rem 0.75rem; background: #ef4444; color: white; border-radius: 0.25rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: background 0.2s; display: inline-flex; align-items: center; gap: 0.25rem; margin: 0; white-space: nowrap;">
+                                    📁 파일 선택
+                                </label>
+                                <span id="layer2Name" style="font-size: 0.8rem; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">선택된 소품 없음 (jpg/png/webm)</span>
+                                <input type="file" accept="image/*,video/webm" id="layer2Upload" style="display: none;">
+                            </div>
+                        </div>
+
+                        <!-- 레이어 3: 배경 -->
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="color: #22c55e; font-weight: 700; font-size: 0.8rem;">🖼️ 레이어 3 (배경 - 최하단)</label>
+                                <button class="btn-small" id="clearLayer3" style="display: none; padding: 1px 6px; font-size: 0.7rem; background: #94a3b8;">삭제</button>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; background: white; border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.25rem 0.5rem; height: 38px; box-sizing: border-box;">
+                                <label for="layer3Upload" style="padding: 0.25rem 0.75rem; background: #22c55e; color: white; border-radius: 0.25rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: background 0.2s; display: inline-flex; align-items: center; gap: 0.25rem; margin: 0; white-space: nowrap;">
+                                    📁 파일 선택
+                                </label>
+                                <span id="layer3Name" style="font-size: 0.8rem; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">선택된 배경 없음 (jpg/png/webm)</span>
+                                <input type="file" accept="image/*,video/webm" id="layer3Upload" style="display: none;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-title">
+                    <span>씬 타임라인 아이템 (현재 컷)</span>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn-add" id="addDialogueBtn">+ 대사 추가</button>
+                        <button class="btn-add btn-add-sfx" id="addSfxBtn">+ 효과음 추가</button>
+                    </div>
+                </div>
+                <div id="sceneListsContainer">
+                    <!-- 동적 생성 -->
+                </div>
+            </div>
+
+            <div id="tab-bgm" class="tab-content">
+                <div class="section-title">
+                    <span>배경음악 및 배경소음 (다중 컷 지원)</span>
+                    <button class="btn-add btn-add-bgm" id="addBgmBtn">+ BGM 추가</button>
+                </div>
+                <div id="bgmList" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- 동적 생성 -->
+                </div>
+            </div>
+
+            <div class="status-text" id="statusText"></div>
+            <button class="play-btn" id="playBtn">▶ 현재 컷 연출 재생</button>
+            <button class="play-btn" id="exportJsonBtn">📥 작품 내보내기 (JSON)</button>
+        </div>
+
+        <div class="preview-wrapper">
+            <div class="preview-title">Scene Canvas</div>
+            <div class="mobile-frame" id="mobileFrame">
+                <!-- 신규 스냅 스크롤 컨테이너 -->
+                <div class="viewer-scroll-container" id="viewerScrollContainer">
+                    <!-- 동적 생성: .viewer-cut-item -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const addDialogueBtn = document.getElementById('addDialogueBtn');
+        const addSfxBtn = document.getElementById('addSfxBtn');
+        const addBgmBtn = document.getElementById('addBgmBtn');
+        
+        const sceneListsContainer = document.getElementById('sceneListsContainer');
+        const cutTabs = document.getElementById('cutTabs');
+        viewerScrollContainer = document.getElementById('viewerScrollContainer');
+        
+        // 3중 레이어 선택 및 관리용 엘리먼트 바인딩
+        const layer1Upload = document.getElementById('layer1Upload');
+        const layer1Name = document.getElementById('layer1Name');
+        const clearLayer1 = document.getElementById('clearLayer1');
+
+        const layer2Upload = document.getElementById('layer2Upload');
+        const layer2Name = document.getElementById('layer2Name');
+        const clearLayer2 = document.getElementById('clearLayer2');
+
+        const layer3Upload = document.getElementById('layer3Upload');
+        const layer3Name = document.getElementById('layer3Name');
+        const clearLayer3 = document.getElementById('clearLayer3');
+
+        const cutEffectSelect = document.getElementById('cutEffectSelect');
+        const addCutBtn = document.getElementById('addCutBtn');
+        
+        const bgmList = document.getElementById('bgmList');
+        const playBtn = document.getElementById('playBtn');
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        const statusText = document.getElementById('statusText');
+        const mobileFrame = document.getElementById('mobileFrame');
+
+        // 멀티 컷 및 트랙 관리를 위한 변수들
+        let cutCounter = 0;
+        var cuts = window.cuts = window.cuts || [];
+        var currentCutId = window.currentCutId = window.currentCutId || null;
+        var isSyncScrolling = window.isSyncScrolling = window.isSyncScrolling || false; // 무한 루프 방지 및 programmatic 스크롤 감지 락
+        var programmaticScrollAnimId = window.programmaticScrollAnimId = window.programmaticScrollAnimId || null; // 신규: 재생(Play) 버튼 전용 스크롤 애니메이션 ID
+        var isTimeBasedAutoplay = window.isTimeBasedAutoplay = window.isTimeBasedAutoplay || false; // 신규: 시간 기반 자동 연출 재생 여부 플래그
+        var lastSettledCutId = window.lastSettledCutId = window.lastSettledCutId || null;     // 신규: 스크롤 정지 시 중복 재생 방지 상태 캐시
+        var lastFrameTime = window.lastFrameTime = window.lastFrameTime || 0;           // 신규: 시간 기반 프레임 연출 갱신용 타임스탬프
+        var isProgrammaticPlaying = window.isProgrammaticPlaying = window.isProgrammaticPlaying || false; // 신규: 재생(Play) 버튼을 통한 programmatic 재생 중 플래그
+
+        // [신규] 3중 레이어 (캐릭터, 소품, 배경) 비디오/이미지 혼합 오버레이 동적 렌더러
+        function renderCutLayers(cutItem, cutData) {
+            // 기존에 생성되어 있던 레이어 엘리먼트들 일괄 소멸
+            cutItem.querySelectorAll('.cut-layer, .cut-bg-image').forEach(el => el.remove());
+
+            function buildLayer(layerIndex, layerObj) {
+                if (!layerObj || !layerObj.url) return null;
+
+                let el;
+                if (layerObj.type === 'video') {
+                    el = document.createElement('video');
+                    el.src = layerObj.url;
+                    el.autoplay = true;
+                    el.loop = true;
+                    el.muted = true;
+                    el.playsinline = true;
+                    el.setAttribute('autoplay', '');
+                    el.setAttribute('loop', '');
+                    el.setAttribute('muted', '');
+                    el.setAttribute('playsinline', '');
+                } else {
+                    el = document.createElement('div');
+                    el.style.backgroundImage = `url(${layerObj.url})`;
+                }
+
+                el.className = 'cut-layer';
+                el.dataset.layer = layerIndex;
+
+                // Stacking order: 레이어 3(배경 - z-index: 1), 레이어 2(소품 - z-index: 2), 레이어 1(캐릭터 - z-index: 3)
+                if (layerIndex === 3) el.style.zIndex = '1';
+                else if (layerIndex === 2) el.style.zIndex = '2';
+                else if (layerIndex === 1) el.style.zIndex = '3';
+
+                // 컷의 고유 연출 효과 클래스 주입
+                if (cutData.effectType && cutData.effectType !== 'none' && cutData.effectType !== 'shake') {
+                    el.classList.add(`effect-${cutData.effectType}`);
+                    if (cutItem.classList.contains('active')) {
+                        el.classList.add('active');
+                    }
+                }
+
+                return el;
+            }
+
+            const l3 = buildLayer(3, cutData.layer3 || (cutData.bgImage ? { url: cutData.bgImage, name: cutData.bgImageName || '배경', type: 'image' } : null));
+            const l2 = buildLayer(2, cutData.layer2);
+            const l1 = buildLayer(1, cutData.layer1);
+
+            const bubbleContainer = cutItem.querySelector('.bubble-container');
+
+            if (l3) cutItem.insertBefore(l3, bubbleContainer);
+            if (l2) cutItem.insertBefore(l2, bubbleContainer);
+            if (l1) cutItem.insertBefore(l1, bubbleContainer);
+
+            // 레이어가 전혀 배치되지 않았다면 바둑판 눈금 그리드가 보이도록 초기화
+            if (!l1 && !l2 && !l3) {
+                cutItem.style.backgroundImage = '';
+                cutItem.style.backgroundColor = '';
+            } else {
+                cutItem.style.backgroundImage = 'none';
+                cutItem.style.backgroundColor = '#111827';
+            }
+        }
+
+        function createCut() {
+            try {
+                const cutId = `cut_${cutCounter++}`;
+                const cutData = {
+                    id: cutId,
+                    index: cuts.length + 1,
+                    layer1: null, // 캐릭터 { url, name, type }
+                    layer2: null, // 소품 { url, name, type }
+                    layer3: null, // 배경 { url, name, type }
+                    effectType: 'none'
+                };
+                cuts.push(cutData);
+
+                // 탭 버튼 생성
+                const tabBtn = document.createElement('button');
+                tabBtn.className = 'cut-tab';
+                tabBtn.textContent = `컷 ${cutData.index}`;
+                tabBtn.dataset.cutId = cutId;
+                tabBtn.addEventListener('click', () => selectCut(cutId, true));
+                cutTabs.appendChild(tabBtn);
+
+                // 씬 리스트 생성
+                const sceneList = document.createElement('div');
+                sceneList.className = 'cut-scene-list';
+                sceneList.id = `sceneList_${cutId}`;
+                sceneListsContainer.appendChild(sceneList);
+
+                // 뷰어 컷 아이템 및 버블 컨테이너 구조적 개선
+                const cutItem = document.createElement('div');
+                cutItem.className = 'viewer-cut-item';
+                cutItem.id = `viewerCut_${cutId}`;
+                cutItem.dataset.cutId = cutId;
+
+                // 버블 컨테이너 생성
+                const bubbleContainer = document.createElement('div');
+                bubbleContainer.className = 'bubble-container';
+                bubbleContainer.id = `bubbleContainer_${cutId}`;
+                cutItem.appendChild(bubbleContainer);
+
+                viewerScrollContainer.appendChild(cutItem);
+
+                selectCut(cutId, true);
+                return cutId;
+            } catch (err) {
+                console.error("[createCut Error]", err);
+                alert("[createCut Error]\n" + (err.stack || err.message));
+                throw err;
+            }
+        }
+
+        function syncCutActiveClasses(cutId) {
+            cuts.forEach(c => {
+                const cutItem = document.getElementById(`viewerCut_${c.id}`);
+                if (cutItem) {
+                    const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
+                    const isActive = c.id === cutId;
+                    
+                    cutItem.className = 'viewer-cut-item';
+                    
+                    layers.forEach(layer => {
+                        layer.className = layer.classList.contains('cut-layer') ? 'cut-layer' : 'cut-bg-image';
+                        if (c.effectType && c.effectType !== 'none') {
+                            if (c.effectType !== 'shake') {
+                                layer.classList.add(`effect-${c.effectType}`);
+                            }
+                        }
+                        if (isActive) {
+                            layer.classList.add('active');
+                        }
+                    });
+
+                    if (c.effectType === 'shake') {
+                        cutItem.classList.add('effect-shake');
+                    }
+
+                    if (isActive) {
+                        void cutItem.offsetWidth;
+                        cutItem.classList.add('active');
+                    }
+                }
+            });
+        }
+
+        function selectCut(cutId, smoothScroll = true) {
+            try {
+                // [요청 1 & 2] 컷 전환 즉시 시각적 락(Hard Reset) 및 transition: none 상태 명확한 검증 후 DOMReflow 호출
+                document.querySelectorAll('.speech-bubble').forEach(bubble => {
+                    // transition이 확실하게 none인지 3중 검증 가드 로직 적용
+                    const computedStyle = window.getComputedStyle(bubble);
+                    if (bubble.style.transition !== 'none' || computedStyle.transitionDuration !== '0s') {
+                        bubble.style.transition = 'none';
+                    }
+                    
+                    // SVG 말꼬리 및 하위 경로 요소 transition: none 명확화 및 윈도우 스타일 검증
+                    const tailSvg = bubble.querySelector('.tail-svg');
+                    const paths = bubble.querySelectorAll('.bubble-path');
+                    if (tailSvg) {
+                        const tailComputed = window.getComputedStyle(tailSvg);
+                        if (tailSvg.style.transition !== 'none' || tailComputed.transitionDuration !== '0s') {
+                            tailSvg.style.transition = 'none';
+                        }
+                    }
+                    if (paths.length > 0) {
+                        paths.forEach(path => {
+                            const pathComputed = window.getComputedStyle(path);
+                            if (path.style.transition !== 'none' || pathComputed.transitionDuration !== '0s') {
+                                path.style.transition = 'none';
+                            }
+                        });
+                    }
+
+                    bubble.classList.remove('show');
+                    bubble.classList.add('animate');
+                    bubble.style.opacity = '0'; // 트랜지션 완료 대기 없이 눈앞에서 즉각 소멸 (Display: None 효과)
+                    
+                    if (tailSvg) tailSvg.style.opacity = '0';
+                    if (paths.length > 0) paths.forEach(path => path.style.opacity = '0');
+                    
+                    const textLayer = bubble.querySelector('.bubble-text-layer');
+                    if (textLayer) {
+                        textLayer.style.visibility = 'hidden';
+                        textLayer.style.opacity = '0';
+                    }
+                    const spans = bubble.querySelectorAll('.typing-wrapper span');
+                    spans.forEach(s => {
+                        s.style.display = 'none';
+                        s.style.opacity = '0';
+                    });
+                    
+                    // 비활성 컷 말풍선 transition: none force 적용 확인 후 DOMReflow 강제 실행
+                    if (bubble.style.transition === 'none' && (!tailSvg || tailSvg.style.transition === 'none')) {
+                        void bubble.offsetWidth;
+                    }
+                    
+                    bubble.style.transition = '';
+                    if (tailSvg) tailSvg.style.transition = '';
+                    if (paths.length > 0) paths.forEach(path => path.style.transition = '');
+                });
+
+                // programmatic 스크롤 중이라면 즉시 취소 및 락 해제
+                if (programmaticScrollAnimId) {
+                    cancelAnimationFrame(programmaticScrollAnimId);
+                    programmaticScrollAnimId = null;
+                }
+                isSyncScrolling = false;
+
+                // 재생 강제 중지 및 오디오/타임라인 리셋
+                isPlayMode = false;
+                activeSessionId = null;
+                if (playAnimationId) {
+                    cancelAnimationFrame(playAnimationId);
+                    playAnimationId = null;
+                }
+                
+                accumulatedTime = 0;
+                
+                document.querySelectorAll('.timeline-playhead').forEach(ph => {
+                    ph.style.opacity = '0';
+                    ph.style.left = '0%';
+                });
+                stopAllAudios();
+
+                currentCutId = cutId;
+                
+                // 1. 좌측 컷 선택 탭 클래스 토글
+                document.querySelectorAll('.cut-tab').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.cutId === cutId);
+                });
+
+                // 2. 좌측 씬 리스트(대사/효과음 리스트) 활성화
+                document.querySelectorAll('.cut-scene-list').forEach(list => {
+                    list.classList.toggle('active', list.id === `sceneList_${cutId}`);
+                });
+
+                // 3. 우측 뷰어 내 활성화 클래스 적용 및 연출 애니메이션 발동
+                syncCutActiveClasses(cutId);
+
+                // 4. 연출 효과 선택 박스 싱크 동기화
+                const cut = cuts.find(c => c.id === cutId);
+                if (cut) {
+                    cutEffectSelect.value = cut.effectType || 'none';
+                    syncGlobalBgms(cut.index);
+                    
+                    // 레이어 1 싱크
+                    if (cut.layer1) {
+                        layer1Name.textContent = cut.layer1.name;
+                        layer1Name.style.color = '#1f2937';
+                        clearLayer1.style.display = 'inline-block';
+                    } else {
+                        layer1Name.textContent = '선택된 캐릭터 없음 (jpg/png/webm)';
+                        layer1Name.style.color = '#6b7280';
+                        clearLayer1.style.display = 'none';
+                    }
+
+                    // 레이어 2 싱크
+                    if (cut.layer2) {
+                        layer2Name.textContent = cut.layer2.name;
+                        layer2Name.style.color = '#1f2937';
+                        clearLayer2.style.display = 'inline-block';
+                    } else {
+                        layer2Name.textContent = '선택된 소품 없음 (jpg/png/webm)';
+                        layer2Name.style.color = '#6b7280';
+                        clearLayer2.style.display = 'none';
+                    }
+
+                    // 레이어 3 싱크
+                    if (cut.layer3) {
+                        layer3Name.textContent = cut.layer3.name;
+                        layer3Name.style.color = '#1f2937';
+                        clearLayer3.style.display = 'inline-block';
+                    } else if (cut.bgImage) { // 구버전 호환 지원
+                        layer3Name.textContent = cut.bgImageName || '선택된 배경 없음';
+                        layer3Name.style.color = '#1f2937';
+                        clearLayer3.style.display = 'inline-block';
+                    } else {
+                        layer3Name.textContent = '선택된 배경 없음 (jpg/png/webm)';
+                        layer3Name.style.color = '#6b7280';
+                        clearLayer3.style.display = 'none';
+                    }
+                }
+
+                // 5. 스냅 스크롤 이동 및 큐 구성
+                const targetItem = document.getElementById(`viewerCut_${cutId}`);
+                if (targetItem) {
+                    // [요청 3] 신규 컷의 선제적 숨김(Pre-hide)
+                    // 렌더링된 요소들이 0.1초라도 먼저 보이지 않도록 targetItem 내부의 모든 bubble에 대해 transition: none; opacity: 0; 선제 적용
+                    targetItem.querySelectorAll('.speech-bubble').forEach(bubble => {
+                        bubble.style.transition = 'none';
+                        bubble.style.opacity = '0';
+                        bubble.classList.remove('show');
+                        bubble.classList.add('animate');
+                        
+                        const tailSvg = bubble.querySelector('.tail-svg');
+                        const paths = bubble.querySelectorAll('.bubble-path');
+                        if (tailSvg) {
+                            tailSvg.style.transition = 'none';
+                            tailSvg.style.opacity = '0';
+                        }
+                        if (paths.length > 0) {
+                            paths.forEach(path => {
+                                path.style.transition = 'none';
+                                path.style.opacity = '0';
+                            });
+                        }
+                        
+                        const spans = bubble.querySelectorAll('.typing-wrapper span');
+                        spans.forEach(s => s.style.opacity = '0');
+                        
+                        // transition: none 상태 확정 보정
+                        if (window.getComputedStyle(bubble).transitionDuration !== '0s') {
+                            bubble.style.transition = 'none';
+                            if (tailSvg) tailSvg.style.transition = 'none';
+                            if (paths.length > 0) paths.forEach(path => path.style.transition = 'none');
+                        }
+                    });
+                    
+                    // Pre-hide 스타일 즉각 반영을 위한 DOMReflow 강제 실행
+                    void targetItem.offsetHeight;
+
+                    buildPlayItemsQueue(cutId);
+                    
+                    if (smoothScroll) {
+                        // 고성능 programmatic scroll animation 기동 (premium easeInOutQuad easing)
+                        animateScrollTo(targetItem.offsetTop, 600, () => {
+                            lastSettledCutId = cutId; // 버튼 전환 완료 시 Settled ID 동기화
+                            
+                            // [요청 3] 안착 후 (animateScrollTo 완료 직후) 비로소 show 클래스 부여하는 구조로 순서 재조정
+                            targetItem.querySelectorAll('.speech-bubble').forEach(bubble => {
+                                bubble.style.transition = 'none';
+                                bubble.classList.remove('animate');
+                                bubble.classList.add('show');
+                                bubble.classList.add('force-render'); // Add force-render during static view
+                                bubble.style.opacity = '1';
+                                
+                                const tailSvg = bubble.querySelector('.tail-svg');
+                                const paths = bubble.querySelectorAll('.bubble-path');
+                                if (tailSvg) {
+                                    tailSvg.style.transition = 'none';
+                                    tailSvg.style.opacity = '1';
+                                }
+                                if (paths.length > 0) {
+                                    paths.forEach(path => {
+                                        path.style.transition = 'none';
+                                        path.style.opacity = '1';
+                                    });
+                                }
+                                
+                                const textLayer = bubble.querySelector('.bubble-text-layer');
+                                if (textLayer) {
+                                    textLayer.style.visibility = 'visible';
+                                    textLayer.style.opacity = '1';
+                                }
+                                const spans = bubble.querySelectorAll('.typing-wrapper span');
+                                spans.forEach(s => {
+                                    s.style.display = 'inline-block';
+                                    s.style.opacity = '1';
+                                });
+                                
+                                void bubble.offsetWidth; // Reflow
+                                
+                                bubble.style.transition = '';
+                                if (tailSvg) tailSvg.style.transition = '';
+                                if (paths.length > 0) paths.forEach(path => path.style.transition = '');
+                            });
+                            
+                            showStatus("컷 전환 완료!");
+                        });
+                    } else {
+                        viewerScrollContainer.scrollTop = targetItem.offsetTop;
+                        handleScrollUpdate();
+                        lastSettledCutId = cutId; // 즉시 이동 시에도 Settled ID 동기화
+                        
+                        // [요청 3] scrollTop 변경 직후 비로소 show 클래스 부여하는 구조로 순서 재조정
+                        targetItem.querySelectorAll('.speech-bubble').forEach(bubble => {
+                            bubble.style.transition = 'none';
+                            bubble.classList.remove('animate');
+                            bubble.classList.add('show');
+                            bubble.classList.add('force-render'); // Add force-render during static view
+                            bubble.style.opacity = '1';
+                            
+                            const tailSvg = bubble.querySelector('.tail-svg');
+                            const paths = bubble.querySelectorAll('.bubble-path');
+                            if (tailSvg) {
+                                tailSvg.style.transition = 'none';
+                                tailSvg.style.opacity = '1';
+                            }
+                            if (paths.length > 0) {
+                                paths.forEach(path => {
+                                    path.style.transition = 'none';
+                                    path.style.opacity = '1';
+                                });
+                            }
+                            
+                            const textLayer = bubble.querySelector('.bubble-text-layer');
+                            if (textLayer) {
+                                textLayer.style.visibility = 'visible';
+                                textLayer.style.opacity = '1';
+                            }
+                            const spans = bubble.querySelectorAll('.typing-wrapper span');
+                            spans.forEach(s => {
+                                s.style.display = 'inline-block';
+                                s.style.opacity = '1';
+                            });
+                            
+                            void bubble.offsetWidth; // Reflow
+                            
+                            bubble.style.transition = '';
+                            if (tailSvg) tailSvg.style.transition = '';
+                            if (paths.length > 0) paths.forEach(path => path.style.transition = '');
+                        });
+                    }
+                }
+
+                layer1Upload.value = '';
+                layer2Upload.value = '';
+                layer3Upload.value = '';
+            } catch (err) {
+                console.error("[selectCut Error]", err);
+                alert("[selectCut Error]\n" + (err.stack || err.message));
+                throw err;
+            }
+        }
+
+        // 컷 연출 효과 드롭다운 이벤트 연동
+        cutEffectSelect.addEventListener('change', (e) => {
+            if (!currentCutId || isPlayMode) return;
+            const effect = e.target.value;
+            const cut = cuts.find(c => c.id === currentCutId);
+            if (cut) {
+                cut.effectType = effect;
+                
+                // 연출 효과 프리뷰 즉각 적용
+                const cutItem = document.getElementById(`viewerCut_${currentCutId}`);
+                if (cutItem) {
+                    const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
+                    
+                    cutItem.className = 'viewer-cut-item';
+                    
+                    layers.forEach(layer => {
+                        layer.className = layer.classList.contains('cut-layer') ? 'cut-layer' : 'cut-bg-image';
+                        if (effect !== 'none') {
+                            if (effect !== 'shake') {
+                                layer.classList.add(`effect-${effect}`);
+                            }
+                        }
+                    });
+
+                    if (effect === 'shake') {
+                        cutItem.classList.add('effect-shake');
+                    }
+                    
+                    // 연출 애니메이션 트리거
+                    cutItem.classList.remove('active');
+                    layers.forEach(layer => {
+                        layer.classList.remove('active');
+                    });
+
+                    void cutItem.offsetWidth; // Reflow
+                    
+                    cutItem.classList.add('active');
+                    layers.forEach(layer => {
+                        layer.classList.add('active');
+                    });
+                    
+                    showStatus(`컷 ${cut.index} 연출 효과 적용: ${e.target.options[e.target.selectedIndex].text}`);
+                }
+            }
+        });
+
+        // [신규] 스크롤 속도 계산, 가속 제어 및 양방향 진행 방향 감지 변수들
+        var lastScrollTop = 0;
+        var lastScrollTime = performance.now();
+        speedMultiplier = window.speedMultiplier = 1.0;
+        isFastForwarding = window.isFastForwarding = false; // [빨리감기] 더블탭/더블클릭 홀드 여부
+        var scrollEndTimeout = null;
+        var decelAnimId = null;
+        isScrollDirectionDown = window.isScrollDirectionDown = true; // 실시간 스크롤 진행 방향 (정방향=true, 역방향=false)
+
+        function decelerateMultiplier() {
+            if (isFastForwarding) return; // 빨리감기 활성화 중에는 스크롤 감속 로직 차단
+            if (speedMultiplier > 1.0) {
+                speedMultiplier -= 0.15; // 부드러운 감속
+                if (speedMultiplier < 1.0) speedMultiplier = 1.0;
+                updatePlayingAudiosPlaybackRate();
+                decelAnimId = requestAnimationFrame(decelerateMultiplier);
+            } else {
+                speedMultiplier = 1.0;
+                updatePlayingAudiosPlaybackRate();
+            }
+        }
+
+        function updatePlayingAudiosPlaybackRate() {
+            playingAudios.forEach(audio => {
+                try {
+                    audio.playbackRate = speedMultiplier;
+                } catch(e) {}
+            });
+        }
+
+
+
+        // 우측 뷰어 스크롤 감지 및 제어 연동
+        viewerScrollContainer.addEventListener('scroll', () => {
+            if (cuts.length === 0) return;
+
+            if (isFastForwarding) {
+                lastScrollTop = viewerScrollContainer.scrollTop;
+                return;
+            }
+
+            // [개선] 시간 기반 자동 재생(isTimeBasedAutoplay)이 돌고 있을 때는 브라우저의 미세 관성 scroll 이벤트가
+            // 오토플레이 상태를 1프레임만에 꺼트리지 않도록 철벽 보호합니다.
+            // 사용자의 진짜 물리적 인터랙션(휠, 터치 등) 감지는 별도의 물리 리스너에서 전담 처리하므로
+            // 여기서는 오토플레이 플래그를 강제로 false로 변경하지 않습니다.
+            
+            // 1. 실시간 스크롤 속도 계산 및 가속 배율 동적 갱신
+            const now = performance.now();
+            const scrollTop = viewerScrollContainer.scrollTop;
+            const dt = now - lastScrollTime;
+            
+            if (dt > 10) {
+                const dy = Math.abs(scrollTop - lastScrollTop);
+                const scrollVelocity = dy / dt; // px/ms
+                
+                if (decelAnimId) {
+                    cancelAnimationFrame(decelAnimId);
+                    decelAnimId = null;
+                }
+                
+                // 가속 공식 (최대 6.0배 가속)
+                speedMultiplier = 1.0 + Math.min(5.0, scrollVelocity * 2.5);
+                updatePlayingAudiosPlaybackRate();
+                
+                lastScrollTime = now;
+            }
+
+            // 스크롤 방향 감지 (정방향 vs 역방향 되감기)
+            isScrollDirectionDown = scrollTop >= lastScrollTop;
+            lastScrollTop = scrollTop;
+
+            clearTimeout(scrollEndTimeout);
+            scrollEndTimeout = setTimeout(function checkScrollEnd() {
+                const scrollTop = viewerScrollContainer.scrollTop;
+                const containerHeight = viewerScrollContainer.clientHeight || 640;
+                
+                // 현재 스크롤 위치와 가장 가까운 스냅 목표 오프셋 계산
+                const targetCutIdx = Math.round(scrollTop / containerHeight);
+                const targetScrollTop = targetCutIdx * containerHeight;
+                
+                // [스마트 안착 대기] 네이티브 CSS 스냅 스크롤이 안착점에 도달할 때까지 50ms 재귀 폴링
+                if (Math.abs(scrollTop - targetScrollTop) > 3) {
+                    scrollEndTimeout = setTimeout(checkScrollEnd, 50);
+                    return;
+                }
+                
+                // 이제 진짜 스냅 정지 지점에 정밀 안착함!
+                if (!isSyncScrolling) {
+                    const activeCut = cuts[targetCutIdx];
+                    if (activeCut) {
+                        const settledCutId = activeCut.id;
+                        
+                        // 활성 컷이 실제로 변경된 경우에만 0.0초 시점부터 시네마틱 자동 재생
+                        if (settledCutId !== lastSettledCutId) {
+                            isTimeBasedAutoplay = true;
+                            accumulatedTime = 0.0;
+                            lastSettledCutId = settledCutId;
+                            currentCutId = settledCutId; // 명시적 싱크
+                            triggerAutoplayForCurrentCut();
+                        } else {
+                            // [개선] 자동 재생 연출(isTimeBasedAutoplay)이 이미 성공적으로 시작되어 돌고 있는 동안에는,
+                            // 미세 잔여 스냅 안착 판정에 의해 restoreEditMode()가 조기에 강제 소환되는 것을 철저히 격리합니다!
+                            if (!isTimeBasedAutoplay) {
+                                restoreEditMode();
+                            }
+                        }
+                    }
+                }
+                
+                if (!decelAnimId) {
+                    decelAnimId = requestAnimationFrame(decelerateMultiplier);
+                }
+            }, 150); // 반응 속도를 150ms로 단축하여 휠 정지 즉시 생동감 있게 기동
+
+            // 2. 스크롤 진행 상황 처리
+            handleScrollUpdate();
+        });
+
+        // [신규] 사용자의 진짜 물리적인 수동 인터랙션(휠 굴리기, 터치 시작 등) 발생 시에만
+        // 안전하게 자동 재생 연출을 정지시키고 편집/수동 스크러빙 모드로 회귀시킵니다.
+        function handleUserDirectInteraction() {
+            // 400ms 미세 관성 및 사용자 터치 해제 잔여 이벤트 락아웃 가드
+            if (performance.now() - (window.autoplayStartTime || 0) < 400) {
+                return;
+            }
+            if (isTimeBasedAutoplay && !isProgrammaticPlaying) {
+                restoreEditMode();
+                showStatus("⏹ 수동 조작으로 연출이 중지되었습니다.");
+            }
+        }
+        
+        viewerScrollContainer.addEventListener('wheel', handleUserDirectInteraction, { passive: true });
+        viewerScrollContainer.addEventListener('touchstart', handleUserDirectInteraction, { passive: true });
+        viewerScrollContainer.addEventListener('mousedown', (e) => {
+            // 스크롤바 드래그나 스크롤 영역 클릭으로 수동 인터랙션 개시 시
+            if (e.target === viewerScrollContainer) {
+                handleUserDirectInteraction();
+            }
+        });
+
+        // 3중 레이어 개별 파일 업로드 및 삭제 제어 연계
+        function setupLayerUploader(layerIndex, uploadInput, nameSpan, clearBtn) {
+            uploadInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file && currentCutId) {
+                    const cut = cuts.find(c => c.id === currentCutId);
+                    const layerPropName = `layer${layerIndex}`;
+                    
+                    // 기존 리소스 해제
+                    if (cut[layerPropName] && cut[layerPropName].url) {
+                        URL.revokeObjectURL(cut[layerPropName].url);
+                    }
+
+                    const type = file.type.startsWith('video/') ? 'video' : 'image';
+                    cut[layerPropName] = {
+                        url: URL.createObjectURL(file),
+                        name: file.name,
+                        type: type
+                    };
+                    
+                    nameSpan.textContent = file.name;
+                    nameSpan.style.color = '#1f2937';
+                    clearBtn.style.display = 'inline-block';
+
+                    const cutItem = document.getElementById(`viewerCut_${currentCutId}`);
+                    if (cutItem) {
+                        renderCutLayers(cutItem, cut);
+                    }
+                    showStatus(`컷 ${cut.index} 레이어 ${layerIndex} 로드 완료!`);
+                }
+            });
+
+            clearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (currentCutId) {
+                    const cut = cuts.find(c => c.id === currentCutId);
+                    const layerPropName = `layer${layerIndex}`;
+
+                    if (cut[layerPropName]) {
+                        if (cut[layerPropName].url) {
+                            URL.revokeObjectURL(cut[layerPropName].url);
+                        }
+                        cut[layerPropName] = null;
+                    }
+
+                    uploadInput.value = '';
+                    const defaultNames = {
+                        1: '선택된 캐릭터 없음 (jpg/png/webm)',
+                        2: '선택된 소품 없음 (jpg/png/webm)',
+                        3: '선택된 배경 없음 (jpg/png/webm)'
+                    };
+                    nameSpan.textContent = defaultNames[layerIndex];
+                    nameSpan.style.color = '#6b7280';
+                    clearBtn.style.display = 'none';
+
+                    const cutItem = document.getElementById(`viewerCut_${currentCutId}`);
+                    if (cutItem) {
+                        renderCutLayers(cutItem, cut);
+                    }
+                    showStatus(`컷 ${cut.index} 레이어 ${layerIndex} 삭제 완료!`);
+                }
+            });
+        }
+
+        // 각 3중 레이어에 컨트롤러 마인딩 가동
+        setupLayerUploader(1, layer1Upload, layer1Name, clearLayer1);
+        setupLayerUploader(2, layer2Upload, layer2Name, clearLayer2);
+        setupLayerUploader(3, layer3Upload, layer3Name, clearLayer3);
+
+        addCutBtn.addEventListener('click', () => createCut());
+
+        let itemCounter = 0;
+        let timeouts = [];
+        playingAudios = window.playingAudios = window.playingAudios || [];
+        isPlayMode = window.isPlayMode = window.isPlayMode || false;
+        let audioCtx = null;
+
+
+
+
+        // 마우스 상호작용 변수들
+        let isDraggingBubble = false; let isDraggingTip = false; let isDraggingBase = false;
+        let currentBubble = null; let currentCard = null;
+        let startMouseX = 0, startMouseY = 0, startTipDx = 0, startTipDy = 0, offsetX = 0, offsetY = 0;
+        let currentXInput = null, currentYInput = null;
+
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const bubble = entry.target.closest('.speech-bubble');
+                if (bubble) updateTail(bubble);
+            }
+        });
+
+        // 탭 전환 로직
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.target).classList.add('active');
+            });
+        });
+
+        function getContrastYIQ(hexcolor){
+            if(!hexcolor) return '#111827';
+            hexcolor = hexcolor.replace("#", "");
+            var r = parseInt(hexcolor.substr(0,2),16);
+            var g = parseInt(hexcolor.substr(2,2),16);
+            var b = parseInt(hexcolor.substr(4,2),16);
+            var yiq = ((r*299)+(g*587)+(b*114))/1000;
+            return (yiq >= 128) ? '#111827' : '#ffffff'; 
+        }
+
+        function showStatus(msg) {
+            statusText.textContent = msg;
+            statusText.style.display = 'block';
+            setTimeout(() => { statusText.style.display = 'none'; }, 3000);
+        }
+
+        // ================= 오디오 업로드 핸들러 공통 =================
+        function handleAudioUpload(inputElement, card, durationInputClass) {
+            inputElement.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (card.audioUrl) URL.revokeObjectURL(card.audioUrl);
+                    card.audioUrl = URL.createObjectURL(file);
+                    card.audioName = file.name; // 실제 파일명 캐시 저장
+                    
+                    const tempAudio = new Audio(card.audioUrl);
+                    tempAudio.addEventListener('loadedmetadata', () => {
+                        card.dataset.audioDuration = tempAudio.duration;
+                        if (durationInputClass) {
+                            const durationInput = card.querySelector(durationInputClass);
+                            if (durationInput) {
+                                durationInput.value = tempAudio.duration.toFixed(2);
+                                durationInput.dispatchEvent(new Event('input')); // 슬라이더 연동 실시간 싱크 유발
+                            }
+                        }
+                        showStatus(`"${file.name}" 로드 완료! (길이: ${tempAudio.duration.toFixed(2)}초)`);
+                    });
+                }
+            });
+        }
+
+        // ================= 신규: 고성능 타임라인 마우스 드래그 및 실시간 싱크 매니저 =================
+        function initTimelineSlider(card) {
+            const container = card.querySelector('.timeline-container');
+            if (!container) return;
+
+            const sliderTrack = container.querySelector('.timeline-slider-track');
+            const sliderBlock = container.querySelector('.timeline-slider-block');
+            const label = container.querySelector('.timeline-block-label');
+            const handleLeft = container.querySelector('.handle-left');
+            const handleRight = container.querySelector('.handle-right');
+            const activeRange = container.querySelector('.timeline-active-range');
+
+            const startInput = card.querySelector('.diag-start');
+            const durationInput = card.querySelector('.diag-duration');
+
+            function updateSliderFromInputs() {
+                const start = parseFloat(startInput.value) || 0;
+                const duration = durationInput ? (parseFloat(durationInput.value) || 1.0) : 1.0;
+                
+                let startPct = (start / 10.0) * 100;
+                let durPct = (duration / 10.0) * 100;
+
+                // 경계선 클램핑
+                if (startPct < 0) startPct = 0;
+                if (startPct > 100) startPct = 100;
+                if (startPct + durPct > 100) durPct = 100 - startPct;
+                if (durPct < 1) durPct = 1; // 최소폭 1%
+
+                sliderBlock.style.left = `${startPct}%`;
+                sliderBlock.style.width = `${durPct}%`;
+                activeRange.style.left = `${startPct}%`;
+                activeRange.style.width = `${durPct}%`;
+
+                const endSec = (start + duration).toFixed(1);
+                label.textContent = `${start.toFixed(1)}s - ${endSec}s`;
+            }
+
+            // 인풋 값 바뀔 때마다 실시간 연동
+            startInput.addEventListener('input', updateSliderFromInputs);
+            if (durationInput) {
+                durationInput.addEventListener('input', updateSliderFromInputs);
+            }
+
+            // 마우스 드래그 핸들링
+            let dragMode = null; // 'body', 'left', 'right'
+            let startDragX = 0;
+            let startLeftPct = 0;
+            let startWidthPct = 0;
+
+            function onMouseDown(e, mode) {
+                // 타임라인 조작 시 즉시 편집 모드로 복구하여 락을 해제합니다.
+                restoreEditMode();
+                dragMode = mode;
+                startDragX = e.clientX;
+                
+                const trackRect = sliderTrack.getBoundingClientRect();
+                const blockRect = sliderBlock.getBoundingClientRect();
+                
+                startLeftPct = ((blockRect.left - trackRect.left) / trackRect.width) * 100;
+                startWidthPct = (blockRect.width / trackRect.width) * 100;
+
+                sliderBlock.style.cursor = 'grabbing';
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                e.stopPropagation();
+                e.preventDefault();
+            }
+
+            sliderBlock.addEventListener('mousedown', (e) => {
+                if (e.target === sliderBlock || e.target === label) {
+                    onMouseDown(e, 'body');
+                }
+            });
+
+            handleLeft.addEventListener('mousedown', (e) => {
+                onMouseDown(e, 'left');
+            });
+
+            handleRight.addEventListener('mousedown', (e) => {
+                onMouseDown(e, 'right');
+            });
+
+            function onMouseMove(e) {
+                if (!dragMode) return;
+                const trackRect = sliderTrack.getBoundingClientRect();
+                const deltaX = e.clientX - startDragX;
+                const deltaPct = (deltaX / trackRect.width) * 100;
+
+                if (dragMode === 'body') {
+                    let newLeft = startLeftPct + deltaPct;
+                    if (newLeft < 0) newLeft = 0;
+                    if (newLeft + startWidthPct > 100) newLeft = 100 - startWidthPct;
+                    
+                    sliderBlock.style.left = `${newLeft}%`;
+                    activeRange.style.left = `${newLeft}%`;
+                    
+                    const startVal = (newLeft / 100) * 10.0;
+                    startInput.value = startVal.toFixed(1);
+                    
+                    startInput.dispatchEvent(new Event('input'));
+                } 
+                else if (dragMode === 'left') {
+                    let newLeft = startLeftPct + deltaPct;
+                    if (newLeft < 0) newLeft = 0;
+                    
+                    let maxLeft = startLeftPct + startWidthPct - 2; // 최소 너비 2% 확보
+                    if (newLeft > maxLeft) newLeft = maxLeft;
+
+                    let newWidth = startLeftPct + startWidthPct - newLeft;
+                    sliderBlock.style.left = `${newLeft}%`;
+                    sliderBlock.style.width = `${newWidth}%`;
+                    activeRange.style.left = `${newLeft}%`;
+                    activeRange.style.width = `${newWidth}%`;
+
+                    const startVal = (newLeft / 100) * 10.0;
+                    const durVal = (newWidth / 100) * 10.0;
+                    
+                    startInput.value = startVal.toFixed(1);
+                    if (durationInput) durationInput.value = durVal.toFixed(1);
+                    
+                    startInput.dispatchEvent(new Event('input'));
+                    if (durationInput) durationInput.dispatchEvent(new Event('input'));
+                } 
+                else if (dragMode === 'right') {
+                    let newWidth = startWidthPct + deltaPct;
+                    if (startLeftPct + newWidth > 100) newWidth = 100 - startLeftPct;
+                    if (newWidth < 2) newWidth = 2; // 최소 너비 2%
+
+                    sliderBlock.style.width = `${newWidth}%`;
+                    activeRange.style.width = `${newWidth}%`;
+
+                    const durVal = (newWidth / 100) * 10.0;
+                    if (durationInput) {
+                        durationInput.value = durVal.toFixed(1);
+                        durationInput.dispatchEvent(new Event('input'));
+                    }
+                }
+            }
+
+            function onMouseUp() {
+                dragMode = null;
+                sliderBlock.style.cursor = 'grab';
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+
+            updateSliderFromInputs();
+        }
+
+        // ================= 대사 관리 (음성 오디오 통합) =================
+        function addDialogue(defaultData = null) {
+            // 대사 추가 시 즉시 재생을 중지하고 편집 모드로 복구하여 편집 락을 해제합니다.
+            restoreEditMode();
+
+            const id = `item_${itemCounter++}`;
+            const card = document.createElement('div');
+            card.className = 'card dialogue-item';
+            card.dataset.id = id;
+            
+            const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
+            const data = defaultData || {
+                charName: "캐릭터", charColor: "#ffffff", text: "",
+                start: "0.5", duration: "2.0",
+                x: "10", y: String(20 + (activeSceneList ? activeSceneList.children.length * 20 : 0)),
+                baseAngle: 45, tipDx: 40, tipDy: 40,
+                baseWidth: 14
+            };
+
+            card.dataset.baseAngle = data.baseAngle;
+            card.dataset.tipDx = data.tipDx;
+            card.dataset.tipDy = data.tipDy;
+            card.dataset.baseWidth = data.baseWidth || 14;
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <span class="diag-header-name">🎙️ ${data.charName} 보이스</span>
+                    <button class="btn-small diag-delete-btn">삭제</button>
+                </div>
+                
+                <div class="form-row">
+                    <div style="flex: 1;">
+                        <label>이름</label>
+                        <input type="text" class="diag-char-name" value="${data.charName}">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>말풍선 색상</label>
+                        <input type="color" class="diag-color" value="${data.charColor}">
+                    </div>
+                    <div style="flex: 2;">
+                        <label>개별 음성 파일 업로드 (.mp3, .m4a)</label>
+                        <input type="file" accept="audio/*" class="item-audio-file">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div style="flex: 3;">
+                        <label>대사 텍스트</label>
+                        <textarea class="diag-text" placeholder="대사 입력...">${data.text}</textarea>
+                    </div>
+                    <div style="flex: 1;">
+                        <label>재생 시작(초)</label>
+                        <input type="number" class="diag-start" step="0.1" value="${data.start}">
+                    </div>
+                    <div style="flex: 1;">
+                        <label>길이(초)</label>
+                        <input type="number" class="diag-duration" step="0.1" value="${data.duration}" title="오디오 파일 업로드 시 자동 계산">
+                    </div>
+                </div>
+
+                <!-- 신규 수평 타임라인 제어 바 및 실시간 눈금 표시 -->
+                <div class="form-row" style="margin-top: 0.25rem;">
+                    <div class="timeline-container" style="display: flex; flex-direction: column; gap: 0.35rem; width: 100%; padding: 0.6rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.6rem; box-sizing: border-box;">
+                        <div class="timeline-ticks" style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8; font-weight: 700; padding: 0 4px;">
+                            <span>0.0s</span><span>2.0s</span><span>4.0s</span><span>6.0s</span><span>8.0s</span><span>10.0s</span>
+                        </div>
+                        <!-- 상단 바: 실시간 재생 프로그레스 / 플레이헤드 바 -->
+                        <div class="timeline-monitor-track" style="position: relative; height: 5px; background: #e2e8f0; border-radius: 2.5px;">
+                            <div class="timeline-active-range" style="position: absolute; height: 100%; background: #cbd5e1; opacity: 0.4; border-radius: 2.5px;"></div>
+                            <div class="timeline-playhead" style="position: absolute; top: -4.5px; left: 0%; width: 14px; height: 14px; background: #6366f1; border: 2.5px solid #ffffff; border-radius: 50%; box-shadow: 0 1.5px 3px rgba(0,0,0,0.25); transform: translateX(-50%); pointer-events: none; opacity: 0; transition: opacity 0.2s;"></div>
+                        </div>
+                        <!-- 하단 바: 마우스 드래그 조절 바 -->
+                        <div class="timeline-slider-track" style="position: relative; height: 22px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 5px; cursor: pointer;">
+                            <div class="timeline-slider-block" style="position: absolute; height: 100%; background: #c7d2fe; border: 1px solid #818cf8; border-radius: 4px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; cursor: grab;">
+                                <div class="timeline-handle handle-left" style="width: 7px; height: 100%; background: #4f46e5; border-radius: 3px 0 0 3px; cursor: ew-resize; display: flex; align-items: center; justify-content: center;">
+                                    <div style="width: 1px; height: 8px; background: #ffffff; opacity: 0.8;"></div>
+                                </div>
+                                <span class="timeline-block-label" style="font-size: 0.72rem; font-weight: 800; color: #4f46e5; pointer-events: none; user-select: none; white-space: nowrap;">0.5s - 2.5s</span>
+                                <div class="timeline-handle handle-right" style="width: 7px; height: 100%; background: #4f46e5; border-radius: 0 3px 3px 0; cursor: ew-resize; display: flex; align-items: center; justify-content: center;">
+                                    <div style="width: 1px; height: 8px; background: #ffffff; opacity: 0.8;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row" style="background:#f3f4f6; padding: 0.5rem; border-radius: 0.5rem;">
+                    <div style="flex: 1;"><span style="font-size:0.75rem; color:#6b7280;">👉 캔버스에서 파란 점(뿌리), 빨간 점(끝) 드래그</span></div>
+                    <div><label>위치 X (%)</label><input type="number" class="diag-x" value="${data.x}" step="0.1" min="0" max="100"></div>
+                    <div><label>위치 Y (%)</label><input type="number" class="diag-y" value="${data.y}" step="0.1" min="0" max="100"></div>
+                </div>
+            `;
+            if (activeSceneList) activeSceneList.appendChild(card);
+            handleAudioUpload(card.querySelector('.item-audio-file'), card, '.diag-duration');
+            initTimelineSlider(card); // 타임라인 드래그 기능 기동
+
+            const bubble = document.createElement('div');
+            bubble.className = 'speech-bubble show selected force-render';
+            bubble.style.opacity = ''; // 인라인 opacity 초기화로 CSS 규칙 적용 보장
+            bubble.dataset.cardId = id;
+            bubble.innerHTML = `
+                <div class="bubble-shadow-layer"></div>
+                <div class="bubble-bg-cover"></div>
+                <svg class="tail-svg" viewBox="0 0 1000 1000" width="1000" height="1000" style="opacity: 1;">
+                    <path class="bubble-path bubble-path-fill" d="" style="fill: var(--bubble-color); stroke: none; opacity: 1;" />
+                    <path class="bubble-path bubble-path-stroke" d="" style="fill: none; stroke: #111827; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; opacity: 1;" />
+                </svg>
+                <div class="bubble-text-layer"></div>
+                <div class="handle base-handle" title="뿌리 조절"></div><div class="handle tip-handle" title="꼬리 끝 조절"></div>
+            `;
+            
+            document.querySelectorAll('.speech-bubble').forEach(b => b.classList.remove('selected'));
+            const activeBubbleContainer = document.getElementById(`bubbleContainer_${currentCutId}`);
+            if (activeBubbleContainer) activeBubbleContainer.appendChild(bubble);
+
+            const updateBubbleUI = () => {
+                if (isPlayMode) return; 
+                const cName = card.querySelector('.diag-char-name').value;
+                card.querySelector('.diag-header-name').textContent = cName ? `🎙️ ${cName} 보이스` : "보이스";
+                const text = card.querySelector('.diag-text').value;
+                const color = card.querySelector('.diag-color').value;
+                const x = card.querySelector('.diag-x').value;
+                const y = card.querySelector('.diag-y').value;
+
+                bubble.querySelector('.bubble-text-layer').textContent = text || '(대사 대기중)';
+                bubble.style.setProperty('--bubble-color', color);
+                bubble.style.setProperty('--text-color', getContrastYIQ(color));
+                bubble.style.left = `${x}%`; bubble.style.top = `${y}%`;
+                updateTail(bubble);
+            };
+
+            card.querySelectorAll('input, textarea').forEach(input => input.addEventListener('input', updateBubbleUI));
+            card.addEventListener('mousedown', () => { document.querySelectorAll('.speech-bubble').forEach(b => b.classList.remove('selected')); bubble.classList.add('selected'); });
+            card.querySelector('.diag-delete-btn').addEventListener('click', () => { resizeObserver.unobserve(bubble); card.remove(); bubble.remove(); });
+
+            updateBubbleUI();
+            card.bubbleDOM = bubble;
+            resizeObserver.observe(bubble);
+            return card;
+        }
+
+        // ================= 효과음(SFX) 전용 카드 =================
+        function addSFX() {
+            // 효과음 추가 시 즉시 재생을 중지하고 편집 모드로 복구하여 편집 락을 해제합니다.
+            restoreEditMode();
+
+            const id = `item_${itemCounter++}`;
+            const card = document.createElement('div');
+            card.className = 'card sfx-item';
+            card.dataset.id = id;
+            card.innerHTML = `
+                <div class="card-header">
+                    <span style="color:#ef4444;">💥 효과음 (SFX)</span>
+                    <button class="btn-small diag-delete-btn">삭제</button>
+                </div>
+                <div class="form-row">
+                    <div style="flex: 2;"><label>효과음 이름</label><input type="text" value="효과음 명칭"></div>
+                    <div style="flex: 3;"><label>효과음 파일 (.mp3 등)</label><input type="file" accept="audio/*" class="item-audio-file"></div>
+                    <div style="flex: 1;"><label>재생 시작(초)</label><input type="number" class="diag-start" step="0.1" value="0.0"></div>
+                    <div style="flex: 1;"><label>길이(초)</label><input type="number" class="diag-duration" step="0.1" value="2.0"></div>
+                </div>
+
+                <!-- 효과음 전용 수평 타임라인 제어 바 및 실시간 눈금 표시 (붉은색 테마) -->
+                <div class="form-row" style="margin-top: 0.25rem;">
+                    <div class="timeline-container" style="display: flex; flex-direction: column; gap: 0.35rem; width: 100%; padding: 0.6rem; background: #fff5f5; border: 1px solid #fee2e2; border-radius: 0.6rem; box-sizing: border-box;">
+                        <div class="timeline-ticks" style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #f87171; font-weight: 700; padding: 0 4px;">
+                            <span>0.0s</span><span>2.0s</span><span>4.0s</span><span>6.0s</span><span>8.0s</span><span>10.0s</span>
+                        </div>
+                        <!-- 상단 바: 실시간 재생 프로그레스 / 플레이헤드 바 -->
+                        <div class="timeline-monitor-track" style="position: relative; height: 5px; background: #fee2e2; border-radius: 2.5px;">
+                            <div class="timeline-active-range" style="position: absolute; height: 100%; background: #fca5a5; opacity: 0.4; border-radius: 2.5px;"></div>
+                            <div class="timeline-playhead" style="position: absolute; top: -4.5px; left: 0%; width: 14px; height: 14px; background: #ef4444; border: 2.5px solid #ffffff; border-radius: 50%; box-shadow: 0 1.5px 3px rgba(0,0,0,0.25); transform: translateX(-50%); pointer-events: none; opacity: 0; transition: opacity 0.2s;"></div>
+                        </div>
+                        <!-- 하단 바: 마우스 드래그 조절 바 -->
+                        <div class="timeline-slider-track" style="position: relative; height: 22px; background: #fff5f5; border: 1px solid #fca5a5; border-radius: 5px; cursor: pointer;">
+                            <div class="timeline-slider-block" style="position: absolute; height: 100%; background: #fee2e2; border: 1px solid #f87171; border-radius: 4px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; cursor: grab;">
+                                <div class="timeline-handle handle-left" style="width: 7px; height: 100%; background: #ef4444; border-radius: 3px 0 0 3px; cursor: ew-resize; display: flex; align-items: center; justify-content: center;">
+                                    <div style="width: 1px; height: 8px; background: #ffffff; opacity: 0.8;"></div>
+                                </div>
+                                <span class="timeline-block-label" style="font-size: 0.72rem; font-weight: 800; color: #ef4444; pointer-events: none; user-select: none; white-space: nowrap;">0.0s - 2.0s</span>
+                                <div class="timeline-handle handle-right" style="width: 7px; height: 100%; background: #ef4444; border-radius: 0 3px 3px 0; cursor: ew-resize; display: flex; align-items: center; justify-content: center;">
+                                    <div style="width: 1px; height: 8px; background: #ffffff; opacity: 0.8;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
+            if (activeSceneList) activeSceneList.appendChild(card);
+            handleAudioUpload(card.querySelector('.item-audio-file'), card, '.diag-duration');
+            initTimelineSlider(card); // 타임라인 드래그 기능 기동
+            
+            card.querySelector('.diag-delete-btn').addEventListener('click', () => card.remove());
+        }
+
+        // ================= 글로벌 BGM 오디오 관리 상태 및 제어 함수 =================
+        let activeBgms = window.activeBgms = window.activeBgms || {}; // BGM 카드 ID -> { audio, startCut, endCut, startTime, isPlaying }
+
+        function fadeAudio(audio, startVol, endVol, durationMs, onComplete) {
+            // 이 오디오에 기존 작동 중이던 페이드 타이머가 있다면 즉각 중단하여 이전 콜백 차단
+            if (audio.fadeTimer) {
+                clearInterval(audio.fadeTimer);
+                audio.fadeTimer = null;
+            }
+            
+            const steps = 20;
+            const interval = durationMs / steps;
+            const volStep = (endVol - startVol) / steps;
+            let currentStep = 0;
+            
+            audio.volume = startVol;
+            
+            audio.fadeTimer = setInterval(() => {
+                currentStep++;
+                let nextVol = startVol + volStep * currentStep;
+                if (nextVol < 0) nextVol = 0;
+                if (nextVol > 1) nextVol = 1;
+                audio.volume = nextVol;
+                
+                if (currentStep >= steps) {
+                    clearInterval(audio.fadeTimer);
+                    audio.fadeTimer = null;
+                    audio.volume = endVol;
+                    if (onComplete) onComplete();
+                }
+            }, interval);
+        }
+
+        function updateBgmTrack(card) {
+            const cardId = card.dataset.id;
+            const audioUrl = card.audioUrl;
+            const startCutInput = card.querySelector('.bgm-start-cut');
+            const endCutInput = card.querySelector('.bgm-end-cut');
+            const startCut = startCutInput ? (parseInt(startCutInput.value) || 1) : 1;
+            const endCut = endCutInput ? (parseInt(endCutInput.value) || 1) : 1;
+            const startTimeInput = card.querySelector('.item-start');
+            const startTime = startTimeInput ? (parseFloat(startTimeInput.value) || 0) : 0;
+            
+            if (!audioUrl) {
+                if (activeBgms[cardId]) {
+                    activeBgms[cardId].audio.pause();
+                    delete activeBgms[cardId];
+                }
+                return;
+            }
+
+            if (!activeBgms[cardId]) {
+                const audio = new Audio(audioUrl);
+                audio.loop = true;
+                // 브라우저 또는 오디오 파이프에 의한 루프 풀림 현상 대비 명시적 Fail-safe 이벤트 추가
+                audio.addEventListener('ended', () => {
+                    if (audio.loop && activeBgms[cardId] && activeBgms[cardId].isPlaying) {
+                        audio.currentTime = activeBgms[cardId].startTime;
+                        audio.play().catch(e => console.log("BGM 루프 재동작 오류:", e));
+                    }
+                });
+                audioPipeManager.connectAudio(audio, 'bgm');
+                activeBgms[cardId] = {
+                    audio: audio,
+                    audioUrl: audioUrl,
+                    startCut: startCut,
+                    endCut: endCut,
+                    startTime: startTime,
+                    isPlaying: false
+                };
+            } else {
+                const track = activeBgms[cardId];
+                track.startCut = startCut;
+                track.endCut = endCut;
+                track.startTime = startTime;
+                if (track.audioUrl !== audioUrl) {
+                    track.audio.pause();
+                    const audio = new Audio(audioUrl);
+                    audio.loop = true;
+                    audio.addEventListener('ended', () => {
+                        if (audio.loop && activeBgms[cardId] && activeBgms[cardId].isPlaying) {
+                            audio.currentTime = activeBgms[cardId].startTime;
+                            audio.play().catch(e => console.log("BGM 루프 재동작 오류:", e));
+                        }
+                    });
+                    audioPipeManager.connectAudio(audio, 'bgm');
+                    track.audio = audio;
+                    track.audioUrl = audioUrl;
+                    track.isPlaying = false;
+                }
+            }
+        }
+
+        function syncGlobalBgms(cutIndex) {
+            document.querySelectorAll('.bgm-item').forEach(card => {
+                updateBgmTrack(card);
+            });
+
+            Object.keys(activeBgms).forEach(cardId => {
+                const track = activeBgms[cardId];
+                const inRange = cutIndex >= track.startCut && cutIndex <= track.endCut;
+
+                if (inRange) {
+                    if (!track.isPlaying) {
+                        track.isPlaying = true;
+                        
+                        // 페이드인 시작하기 전에 혹시 돌고 있는 이전 페이드아웃 타이머 중단
+                        if (track.audio.fadeTimer) {
+                            clearInterval(track.audio.fadeTimer);
+                            track.audio.fadeTimer = null;
+                        }
+
+                        track.audio.currentTime = track.startTime;
+                        track.audio.volume = 0;
+                        track.audio.play().then(() => {
+                            fadeAudio(track.audio, 0, 0.25, 1000);
+                        }).catch(e => {
+                            console.log("BGM 자동 재생 대기:", e);
+                            track.isPlaying = false; // 재생 차단 시 상태 복원
+                        });
+                    }
+                } else {
+                    if (track.isPlaying) {
+                        track.isPlaying = false;
+                        const audioToFade = track.audio;
+                        fadeAudio(audioToFade, audioToFade.volume, 0, 1000, () => {
+                            audioToFade.pause();
+                            audioToFade.currentTime = track.startTime;
+                        });
+                    }
+                }
+            });
+        }
+
+        // ================= BGM 전용 카드 =================
+        function addBGM() {
+            // BGM 추가 시 즉시 재생을 중지하고 편집 모드로 복구하여 편집 락을 해제합니다.
+            restoreEditMode();
+
+            const id = `item_${itemCounter++}`;
+            const card = document.createElement('div');
+            card.className = 'card bgm-item';
+            card.dataset.id = id;
+            card.innerHTML = `
+                <div class="card-header">
+                    <span style="color:#22c55e;">🎵 배경음악 (BGM) / 앰비언트</span>
+                    <button class="btn-small diag-delete-btn">삭제</button>
+                </div>
+                <div class="form-row">
+                    <div style="flex: 2;"><label>사운드 트랙 이름</label><input type="text" class="bgm-name" value="메인 브금"></div>
+                    <div style="flex: 3;"><label>BGM 파일 (.mp3 등)</label><input type="file" accept="audio/*" class="item-audio-file"></div>
+                </div>
+                <div class="form-row" style="background:#f0fdf4; padding:0.5rem; border-radius:0.5rem;">
+                    <div><label>시작 컷 번호</label><input type="number" class="bgm-start-cut" step="1" value="1"></div>
+                    <div><label>종료 컷 번호</label><input type="number" class="bgm-end-cut" step="1" value="5"></div>
+                    <div><label>재생 시작점(초)</label><input type="number" class="item-start" step="0.1" value="0.0"></div>
+                    <div style="flex:2; align-items:center; justify-content:center;"><span style="font-size:0.75rem; color:#6b7280;">(지정된 컷 범위 안에서 끊김 없이 자연스럽게 이어서 재생됩니다)</span></div>
+                </div>
+            `;
+            bgmList.appendChild(card);
+            
+            const audioFileInput = card.querySelector('.item-audio-file');
+            audioFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (card.audioUrl) URL.revokeObjectURL(card.audioUrl);
+                    card.audioUrl = URL.createObjectURL(file);
+                    card.audioName = file.name; // 실제 파일명 캐시 저장
+                    
+                    const tempAudio = new Audio(card.audioUrl);
+                    tempAudio.addEventListener('loadedmetadata', () => {
+                        card.dataset.audioDuration = tempAudio.duration;
+                        showStatus(`"${file.name}" BGM 로드 완료! (길이: ${tempAudio.duration.toFixed(2)}초)`);
+                        updateBgmTrack(card);
+                        if (currentCutId) {
+                            const currentCut = cuts.find(c => c.id === currentCutId);
+                            if (currentCut) syncGlobalBgms(currentCut.index);
+                        }
+                    });
+                }
+            });
+
+            card.querySelectorAll('input').forEach(input => {
+                input.addEventListener('change', () => {
+                    updateBgmTrack(card);
+                    if (currentCutId) {
+                        const currentCut = cuts.find(c => c.id === currentCutId);
+                        if (currentCut) syncGlobalBgms(currentCut.index);
+                    }
+                });
+            });
+
+            card.querySelector('.diag-delete-btn').addEventListener('click', () => {
+                if (activeBgms[id]) {
+                    activeBgms[id].audio.pause();
+                    delete activeBgms[id];
+                }
+                card.remove();
+            });
+        }
+
+        addDialogueBtn.addEventListener('click', () => addDialogue());
+        addSfxBtn.addEventListener('click', addSFX);
+        addBgmBtn.addEventListener('click', addBGM);
+
+        // ================= SVG 꼬리표 및 마우스 이벤트 (기존과 동일) =================
+        function updateTail(bubble) {
+            if (!bubble) return;
+            const cardId = bubble.dataset.cardId;
+            const card = document.querySelector(`.dialogue-item[data-id="${cardId}"]`);
+            if (!card) return;
+
+            let baseAngle = parseFloat(card.dataset.baseAngle) || 45; 
+            let tipDx = parseFloat(card.dataset.tipDx) || 30;
+            let tipDy = parseFloat(card.dataset.tipDy) || 30;
+            
+            const pathFill = bubble.querySelector('.bubble-path-fill');
+            const pathStroke = bubble.querySelector('.bubble-path-stroke');
+            if (!pathFill || !pathStroke) return;
+
+            const bw = bubble.offsetWidth;
+            const bh = bubble.offsetHeight;
+            const cx = 500 + bw / 2;
+            const cy = 500 + bh / 2;
+            
+            const rad = baseAngle * Math.PI / 180;
+            const dx = Math.cos(rad);
+            const dy = Math.sin(rad);
+            
+            const tx = cx + tipDx;
+            const ty = cy + tipDy;
+            
+            const halfW = bw / 2;
+            const halfH = bh / 2;
+
+            // [1] 말풍선 둥근 모서리(border-radius) 동적 파싱
+            const computedStyle = window.getComputedStyle(bubble);
+            const borderRadius = parseFloat(computedStyle.borderRadius) || 20;
+            const R = Math.min(borderRadius, halfW, halfH); // 버그 예방용 클램프
+
+            // 가상 직사각형 교점
+            const tv = halfW / Math.max(0.0001, Math.abs(dx));
+            const th = halfH / Math.max(0.0001, Math.abs(dy));
+            const tRect = Math.min(tv, th);
+            const rx = tRect * dx;
+            const ry = tRect * dy;
+
+            let bx_norm, by_norm;
+            const borderX = halfW - R;
+            const borderY = halfH - R;
+
+            // [2] 둥근 모서리 원호 방정식을 활용한 초정밀 접점 기하 연산
+            if (rx > borderX && ry < -borderY) {
+                // 우상 모서리 원호
+                const cxCorner = borderX;
+                const cyCorner = -borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx > borderX && ry > borderY) {
+                // 우하 모서리 원호
+                const cxCorner = borderX;
+                const cyCorner = borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx < -borderX && ry < -borderY) {
+                // 좌상 모서리 원호
+                const cxCorner = -borderX;
+                const cyCorner = -borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx < -borderX && ry > borderY) {
+                // 좌하 모서리 원호
+                const cxCorner = -borderX;
+                const cyCorner = borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else {
+                // 가로/세로 평평한 경계면
+                bx_norm = rx;
+                by_norm = ry;
+            }
+
+            const baseWidth = parseFloat(card.dataset.baseWidth) || 14; 
+            
+            // [4] 경계면 정합에 따른 base 오프셋 px, py 계산
+            let px, py;
+            if (tv < th) {
+                // 세로 경계선 교점 -> 세로 방향으로만 오프셋
+                px = 0;
+                py = Math.sign(dx || 1) * (baseWidth / 2);
+            } else if (th < tv) {
+                // 가로 경계선 교점 -> 가로 방향으로만 오프셋
+                px = -Math.sign(dy || 1) * (baseWidth / 2);
+                py = 0;
+            } else {
+                // 모서리 원호 교점 -> 법선 방향 오프셋
+                px = -dy * (baseWidth / 2);
+                py = dx * (baseWidth / 2);
+            }
+
+            let bx_stroke = cx + bx_norm;
+            let by_stroke = cy + by_norm;
+            const bx1_stroke = bx_stroke + px;
+            const by1_stroke = by_stroke + py;
+            const bx2_stroke = bx_stroke - px;
+            const by2_stroke = by_stroke - py;
+            const cpx_stroke = bx_stroke + (tx - bx_stroke) * 0.35;
+            const cpy_stroke = by_stroke + (ty - by_stroke) * 0.35;
+
+            // [3] 테두리용(Stroke) 패스: 0px 침투 (완벽히 모서리 경계에서 시작), fill: none
+            const d_stroke = `M ${bx1_stroke} ${by1_stroke} Q ${cpx_stroke} ${cpy_stroke} ${tx} ${ty} Q ${cpx_stroke} ${cpy_stroke} ${bx2_stroke} ${by2_stroke}`;
+            pathStroke.setAttribute('d', d_stroke);
+
+            // [3] 채우기용(Fill) 패스: Stroke와 100% 동일한 곡선을 사용하되, 안쪽으로 8px 확장 영역을 덧붙임
+            const bx1_in = bx1_stroke - dx * 8;
+            const by1_in = by1_stroke - dy * 8;
+            const bx2_in = bx2_stroke - dx * 8;
+            const by2_in = by2_stroke - dy * 8;
+            const d_fill = `M ${bx1_stroke} ${by1_stroke} Q ${cpx_stroke} ${cpy_stroke} ${tx} ${ty} Q ${cpx_stroke} ${cpy_stroke} ${bx2_stroke} ${by2_stroke} L ${bx2_in} ${by2_in} L ${bx1_in} ${by1_in} Z`;
+            pathFill.setAttribute('d', d_fill);
+
+            // [6] 말꼬리 가림막 레이어(.bubble-bg-cover) 실시간 배경색 싱크 보강
+            const bgCover = bubble.querySelector('.bubble-bg-cover');
+            if (bgCover) {
+                bgCover.style.backgroundColor = card.querySelector('.diag-color').value || '#ffffff';
+            }
+
+            const baseHandle = bubble.querySelector('.base-handle');
+            const tipHandle = bubble.querySelector('.tip-handle');
+            if (baseHandle) {
+                baseHandle.style.left = `${bx_stroke - 500}px`;
+                baseHandle.style.top = `${by_stroke - 500}px`;
+            }
+            if (tipHandle) {
+                tipHandle.style.left = `${tx - 500}px`;
+                tipHandle.style.top = `${ty - 500}px`;
+            }
+        }
+
+        // ================= SVG 말꼬리 마우스 이벤트 (드래그) =================
+        isDraggingBubble = false;
+        isDraggingBase = false;
+        isDraggingTip = false;
+        let activeDragBubble = null;
+        let dragStartX = 0, dragStartY = 0;
+        let dragStartBubbleLeft = 0, dragStartBubbleTop = 0;
+
+        // [롱프레스/폭 조절 신규 변수]
+        let longPressTimer = null;
+        let isWidthAdjustMode = false;
+        let longPressActive = false;
+        let widthDragStartY = 0;
+        let widthDragStartVal = 14;
+        let baseMouseDownX = 0;
+        let baseMouseDownY = 0;
+
+        // 롱프레스 원형 게이지 바 생성 및 렌더링 함수
+        function showLongPressGauge(handle) {
+            const container = document.createElement('div');
+            container.className = 'width-gauge-container';
+            container.style.cssText = `
+                position: absolute; top: 50%; left: 50%;
+                transform: translate(-50%, -50%);
+                width: 46px; height: 46px;
+                pointer-events: none; z-index: 40;
+                display: flex; align-items: center; justify-content: center;
+            `;
+            
+            const cardId = activeDragBubble.dataset.cardId;
+            const card = document.querySelector(`.dialogue-item[data-id="${cardId}"]`);
+            const currentVal = card ? (parseFloat(card.dataset.baseWidth) || 14) : 14;
+            
+            container.innerHTML = `
+                <svg width="46" height="46" viewBox="0 0 46 46" style="transform: rotate(-90deg); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));">
+                    <circle cx="23" cy="23" r="20" fill="none" stroke="rgba(255, 255, 255, 0.25)" stroke-width="3" />
+                    <circle class="gauge-fill-circle" cx="23" cy="23" r="20" fill="none" stroke="#3b82f6" stroke-width="3.5" 
+                            stroke-dasharray="125.6" stroke-dashoffset="125.6" style="transition: stroke-dashoffset 0.5s linear; stroke-linecap: round;" />
+                </svg>
+                <div class="gauge-tooltip" style="
+                    position: absolute; bottom: 52px;
+                    background: rgba(17, 24, 39, 0.92); color: #ffffff;
+                    padding: 3px 9px; border-radius: 6px;
+                    font-size: 11px; font-weight: 800;
+                    white-space: nowrap; opacity: 0;
+                    transform: translateY(6px);
+                    transition: opacity 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    pointer-events: none; border: 1px solid rgba(255,255,255,0.18);
+                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+                ">폭: ${currentVal.toFixed(0)}px</div>
+            `;
+            
+            handle.appendChild(container);
+            
+            // 다음 프레임에 로더가 차오르도록 즉시 가동
+            requestAnimationFrame(() => {
+                const fillCircle = container.querySelector('.gauge-fill-circle');
+                if (fillCircle) {
+                    fillCircle.style.strokeDashoffset = '0';
+                }
+            });
+        }
+
+        // 롱프레스 성립 시 게이지 바 상태 활성화(골드 맥박 및 툴팁 표출)
+        function activateLongPressGauge(handle) {
+            const container = handle.querySelector('.width-gauge-container');
+            if (!container) return;
+            
+            container.classList.add('activated');
+            
+            const fillCircle = container.querySelector('.gauge-fill-circle');
+            if (fillCircle) {
+                fillCircle.style.transition = 'stroke-dashoffset 0.1s ease, stroke 0.2s ease';
+                fillCircle.style.stroke = '#f59e0b'; // 네온 골드로 게이지 색상 갱신
+            }
+            
+            const tooltip = container.querySelector('.gauge-tooltip');
+            if (tooltip) {
+                tooltip.style.opacity = '1';
+                tooltip.style.transform = 'translateY(0)';
+            }
+        }
+
+        // 게이지 바 파괴 및 서서히 페이드아웃 제거
+        function removeLongPressGauge(handle) {
+            const container = handle.querySelector('.width-gauge-container');
+            if (!container) return;
+            
+            container.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+            container.style.opacity = '0';
+            container.style.transform = 'translate(-50%, -50%) scale(0.8)';
+            
+            setTimeout(() => {
+                if (container.parentNode === handle) {
+                    handle.removeChild(container);
+                }
+            }, 200);
+        }
+        
+        document.addEventListener('mousedown', (e) => {
+            if (isPlayMode) return; // 재생 중에는 드래그 차단
+            
+            const handle = e.target;
+            if (handle.classList.contains('base-handle')) {
+                const bubble = handle.closest('.speech-bubble');
+                activeDragBubble = bubble;
+                
+                // 마우스 클릭 원위치 기록 (드래그 이탈 감지용)
+                baseMouseDownX = e.clientX;
+                baseMouseDownY = e.clientY;
+                longPressActive = false;
+                isWidthAdjustMode = false;
+                
+                // 기존 게이지 파괴 (안전을 위해)
+                removeLongPressGauge(handle);
+                
+                // 게이지 바 동적 생성 및 롱프레스 타이머 시동
+                showLongPressGauge(handle);
+                
+                longPressTimer = setTimeout(() => {
+                    longPressActive = true;
+                    isWidthAdjustMode = true;
+                    // 롱프레스 무사 작동 비주얼 효과 (골드색 활성화 및 툴팁 표출)
+                    activateLongPressGauge(handle);
+                    
+                    const cardId = activeDragBubble.dataset.cardId;
+                    const card = document.querySelector(`.dialogue-item[data-id="${cardId}"]`);
+                    if (card) {
+                        widthDragStartY = e.clientY;
+                        widthDragStartVal = parseFloat(card.dataset.baseWidth) || 14;
+                    }
+                }, 500); // 500ms 동안 가만히 잡고 있으면 폭 조절 모드 가동
+                
+                e.preventDefault();
+            } else if (handle.classList.contains('tip-handle')) {
+                isDraggingTip = true;
+                activeDragBubble = handle.closest('.speech-bubble');
+                e.preventDefault();
+            } else if (handle.closest('.speech-bubble') && !handle.classList.contains('handle')) {
+                const bubble = handle.closest('.speech-bubble');
+                document.querySelectorAll('.speech-bubble').forEach(b => b.classList.remove('selected'));
+                bubble.classList.add('selected');
+                
+                const cardId = bubble.dataset.cardId;
+                const card = document.querySelector(`.dialogue-item[data-id="${cardId}"]`);
+                if (card) {
+                    document.querySelectorAll('.dialogue-item').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                
+                isDraggingBubble = true;
+                activeDragBubble = bubble;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                dragStartBubbleLeft = parseFloat(bubble.style.left) || 0;
+                dragStartBubbleTop = parseFloat(bubble.style.top) || 0;
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!activeDragBubble) return;
+            
+            const cardId = activeDragBubble.dataset.cardId;
+            const card = document.querySelector(`.dialogue-item[data-id="${cardId}"]`);
+            if (!card) return;
+            
+            const sceneCanvas = activeDragBubble.parentElement;
+            if (!sceneCanvas) return;
+            const rect = sceneCanvas.getBoundingClientRect();
+            
+            if (isDraggingBubble) {
+                const dx = ((e.clientX - dragStartX) / rect.width) * 100;
+                const dy = ((e.clientY - dragStartY) / rect.height) * 100;
+                let newX = dragStartBubbleLeft + dx;
+                let newY = dragStartBubbleTop + dy;
+                
+                newX = Math.max(0, Math.min(100, newX));
+                newY = Math.max(0, Math.min(100, newY));
+                
+                activeDragBubble.style.left = `${newX.toFixed(1)}%`;
+                activeDragBubble.style.top = `${newY.toFixed(1)}%`;
+                
+                const xInput = card.querySelector('.diag-x');
+                const yInput = card.querySelector('.diag-y');
+                if (xInput) xInput.value = newX.toFixed(1);
+                if (yInput) yInput.value = newY.toFixed(1);
+                
+                updateTail(activeDragBubble);
+            } 
+            else {
+                // 파란색 뿌리 핸들 드래그 시 롱프레스 상태 분기
+                const handle = activeDragBubble.querySelector('.base-handle');
+                
+                // 1. 폭 조절 모드 드래그 분기 (롱프레스 성공 상태)
+                if (isWidthAdjustMode) {
+                    const dy = widthDragStartY - e.clientY; // Y축 오프셋 (위로 드래그 시 +)
+                    let newWidth = widthDragStartVal + (dy * 0.4);
+                    
+                    // 폭 한계 제한 (2px ~ 80px)
+                    newWidth = Math.max(2, Math.min(80, newWidth));
+                    card.dataset.baseWidth = newWidth.toFixed(1);
+                    
+                    updateTail(activeDragBubble);
+                    
+                    // 원형 게이지 바의 눈금 및 툴팁 실시간 업데이트
+                    if (handle) {
+                        const container = handle.querySelector('.width-gauge-container');
+                        if (container) {
+                            const tooltip = container.querySelector('.gauge-tooltip');
+                            if (tooltip) tooltip.textContent = `폭: ${newWidth.toFixed(0)}px`;
+                            
+                            const fillCircle = container.querySelector('.gauge-fill-circle');
+                            if (fillCircle) {
+                                // 현재 폭의 조절 범위 비율 계산 (2px ~ 80px)
+                                const ratio = (newWidth - 2) / (80 - 2);
+                                const offset = 125.6 * (1 - ratio);
+                                fillCircle.style.strokeDashoffset = offset.toFixed(1);
+                            }
+                        }
+                    }
+                }
+                // 2. 일반 드래그 조작 분기 (각도/위치 조절 및 롱프레스 도중 이탈 감지)
+                else {
+                    const bw = activeDragBubble.offsetWidth;
+                    const bh = activeDragBubble.offsetHeight;
+                    
+                    const bubbleRect = activeDragBubble.getBoundingClientRect();
+                    const cx = bubbleRect.left + bw / 2;
+                    const cy = bubbleRect.top + bh / 2;
+                    
+                    const mx = e.clientX - cx;
+                    const my = e.clientY - cy;
+                    
+                    // 롱프레스 대기 도중 마우스가 mousedown 지점에서 5px 이상 많이 벗어나면 타이머 해제 후 즉시 일반 회전 드래그 모드로 강제 워프!
+                    if (longPressTimer) {
+                        const dist = Math.hypot(e.clientX - baseMouseDownX, e.clientY - baseMouseDownY);
+                        if (dist > 5) {
+                            clearTimeout(longPressTimer);
+                            longPressTimer = null;
+                            isDraggingBase = true;
+                            if (handle) removeLongPressGauge(handle);
+                        }
+                    }
+                    
+                    if (isDraggingBase) {
+                        let angle = Math.atan2(my, mx) * 180 / Math.PI;
+                        if (angle < 0) angle += 360;
+                        card.dataset.baseAngle = angle.toFixed(1);
+                        updateTail(activeDragBubble);
+                    } 
+                    else if (isDraggingTip) {
+                        card.dataset.tipDx = mx.toFixed(1);
+                        card.dataset.tipDy = my.toFixed(1);
+                        updateTail(activeDragBubble);
+                    }
+                }
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            // 롱프레스 기동 중이었을 경우 리소스 청소
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            if (activeDragBubble) {
+                const handle = activeDragBubble.querySelector('.base-handle');
+                if (handle) removeLongPressGauge(handle);
+            }
+            
+            isDraggingBubble = false;
+            isDraggingBase = false;
+            isDraggingTip = false;
+            isWidthAdjustMode = false;
+            longPressActive = false;
+            activeDragBubble = null;
+        });
+
+
+        // ================= 다중 트랙 재생 엔진 (컷별 고유 플레이어) =================
+        function restoreEditMode() {
+            // [개선] 연출 모드 탈출 시 비주얼 효과 인라인 스타일을 최종 완성(1.0) 후 원상 복구(false)하여 잔상을 방지하고 CSS 속성을 복원합니다.
+            if (currentCutId) {
+                renderCutVisualEffects(currentCutId, 1.0, false);
+            }
+            
+            isPlayMode = false;
+            isTimeBasedAutoplay = false; // 오토플레이 리셋
+            playItemsQueue = []; // 큐 정밀 파괴 및 리셋
+            activeSessionId = null; // 세션 명시적 비우기
+            if (playAnimationId) {
+                cancelAnimationFrame(playAnimationId);
+                playAnimationId = null;
+            }
+            if (programmaticScrollAnimId) {
+                cancelAnimationFrame(programmaticScrollAnimId);
+                programmaticScrollAnimId = null;
+            }
+            document.querySelectorAll('.timeline-playhead').forEach(ph => {
+                ph.style.opacity = '0';
+                ph.style.left = '0%';
+            });
+            document.querySelectorAll('.dialogue-item').forEach(card => {
+                const bubble = card.bubbleDOM;
+                if(bubble) { 
+                    bubble.classList.remove('animate'); 
+                    
+                    // 현재 활성화된 컷에 속한 말풍선만 노출하고 완성 텍스트 복구, 나머지는 깔끔히 숨김
+                    const parentSceneList = card.parentElement;
+                    const belongsToCurrentCut = parentSceneList && parentSceneList.id === `sceneList_${currentCutId}`;
+                    
+                    const tailSvg = bubble.querySelector('.tail-svg');
+                    const paths = bubble.querySelectorAll('.bubble-path');
+                    
+                    if (belongsToCurrentCut) {
+                        // 활성 컷 말풍선 및 하위 요소들 transition 임시 비활성화 후 opacity 복원
+                        bubble.style.transition = 'none';
+                        bubble.style.opacity = '1';
+                        if (tailSvg) {
+                            tailSvg.style.transition = 'none';
+                            tailSvg.style.opacity = '1';
+                        }
+                        if (paths.length > 0) {
+                            paths.forEach(path => {
+                                path.style.transition = 'none';
+                                path.style.opacity = '1';
+                            });
+                        }
+                        
+                        bubble.classList.add('show');
+                        bubble.classList.add('force-render');
+                        const textLayer = bubble.querySelector('.bubble-text-layer');
+                        if (textLayer) {
+                            textLayer.style.visibility = 'visible';
+                            textLayer.style.opacity = '1';
+                            const originalText = card.querySelector('.diag-text').value;
+                            textLayer.textContent = originalText || '(대사 대기중)';
+                        }
+                        
+                        void bubble.offsetWidth; // Reflow 강제 적용
+                        
+                        // 원래 transition 복구 및 인라인 opacity 리셋(CSS 스타일 우선순위 유지)
+                        bubble.style.transition = '';
+                        bubble.style.opacity = '';
+                        if (tailSvg) {
+                            tailSvg.style.transition = '';
+                            tailSvg.style.opacity = '';
+                        }
+                        if (paths.length > 0) {
+                            paths.forEach(path => {
+                                path.style.transition = '';
+                                path.style.opacity = '';
+                            });
+                        }
+                    } else {
+                        // 비활성 컷 말풍선들은 완벽히 은폐하고 opacity = 0으로 잠금
+                        bubble.style.transition = 'none';
+                        bubble.style.opacity = '0';
+                        if (tailSvg) {
+                            tailSvg.style.transition = 'none';
+                            tailSvg.style.opacity = '0';
+                        }
+                        if (paths.length > 0) {
+                            paths.forEach(path => {
+                                path.style.transition = 'none';
+                                path.style.opacity = '0';
+                            });
+                        }
+                        
+                        bubble.classList.remove('show');
+                        bubble.classList.remove('force-render');
+                        
+                        void bubble.offsetWidth;
+                        
+                        bubble.style.transition = '';
+                        if (tailSvg) tailSvg.style.transition = '';
+                        if (paths.length > 0) {
+                            paths.forEach(path => {
+                                path.style.transition = '';
+                                path.style.opacity = '';
+                            });
+                        }
+                    }
+                }
+            });
+            stopAllAudios();
+            isProgrammaticPlaying = false; // 재생 락 명시적 해제
+            playBtn.disabled = false; 
+            playBtn.textContent = "▶ 현재 컷 연출 다시 재생";
+            playBtn.style.backgroundColor = "";
+
+            // [UI 동기화 복원 고도화] 원래 타겟 컷의 다중 레이어 파일명 및 연출 세팅으로 복구!
+            const activeCut = cuts.find(c => c.id === currentCutId);
+            if (activeCut) {
+                if (cutEffectSelect) {
+                    cutEffectSelect.value = activeCut.effectType || 'none';
+                }
+                // 레이어 1 복원
+                if (activeCut.layer1) {
+                    layer1Name.textContent = activeCut.layer1.name;
+                    layer1Name.style.color = '#1f2937';
+                    clearLayer1.style.display = 'inline-block';
+                } else {
+                    layer1Name.textContent = '선택된 캐릭터 없음 (jpg/png/webm)';
+                    layer1Name.style.color = '#6b7280';
+                    clearLayer1.style.display = 'none';
+                }
+                // 레이어 2 복원
+                if (activeCut.layer2) {
+                    layer2Name.textContent = activeCut.layer2.name;
+                    layer2Name.style.color = '#1f2937';
+                    clearLayer2.style.display = 'inline-block';
+                } else {
+                    layer2Name.textContent = '선택된 소품 없음 (jpg/png/webm)';
+                    layer2Name.style.color = '#6b7280';
+                    clearLayer2.style.display = 'none';
+                }
+                // 레이어 3 복원
+                if (activeCut.layer3) {
+                    layer3Name.textContent = activeCut.layer3.name;
+                    layer3Name.style.color = '#1f2937';
+                    clearLayer3.style.display = 'inline-block';
+                } else if (activeCut.bgImage) {
+                    layer3Name.textContent = activeCut.bgImageName || '선택된 배경 없음';
+                    layer3Name.style.color = '#1f2937';
+                    clearLayer3.style.display = 'inline-block';
+                } else {
+                    layer3Name.textContent = '선택된 배경 없음 (jpg/png/webm)';
+                    layer3Name.style.color = '#6b7280';
+                    clearLayer3.style.display = 'none';
+                }
+            }
+        }
+
+        function stopAllAudios() {
+            // 대사 및 효과음 오디오들만 멈춤 (글로벌 BGM은 activeBgms에서 별도로 매끄럽게 제어)
+            playingAudios.forEach(a => { a.pause(); a.currentTime = 0; });
+            playingAudios = [];
+        }
+
+        playBtn.addEventListener('click', () => {
+            if (isPlayMode) {
+                stopAllAudios();
+                restoreEditMode();
+                showStatus("⏹ 재생이 중지되었습니다.");
+                return;
+            }
+            
+            const cutIdx = cuts.findIndex(c => c.id === currentCutId);
+            if (cutIdx === -1) return;
+
+            const itemsCount = buildPlayItemsQueue(currentCutId);
+            if (itemsCount === 0) {
+                showStatus("⚠️ 현재 컷에 연출할 아이템이 없습니다.");
+                return;
+            }
+
+            // 재생 락 가동
+            isProgrammaticPlaying = true;
+            isTimeBasedAutoplay = true;
+            accumulatedTime = 0;
+            lastFrameTime = performance.now();
+            playBtn.textContent = "⏹ 연출 재생 중지";
+            playBtn.style.backgroundColor = "#ef4444";
+
+            const containerHeight = viewerScrollContainer.clientHeight || 640;
+            
+            if (cutIdx === 0) {
+                // [1컷 재생 특수 격리] 1컷은 스크롤을 굴리지 않고 0 지점에서 고정 시간 기반 재생 작동!
+                viewerScrollContainer.scrollTop = 0;
+                lastSettledCutId = currentCutId; // 말풍선 선노출 락 강제 언락
+                handleScrollUpdate();
+                
+                triggerAutoplayForCurrentCut();
+            } else {
+                // [그 외 컷 재생] 이전 컷의 스크롤 시작점부터 현재 컷의 끝점까지 600ms 동안 빠른 스냅 스크롤 이동
+                const startScroll = (cutIdx - 1) * containerHeight;
+                const endScroll = cutIdx * containerHeight;
+
+                viewerScrollContainer.scrollTop = startScroll;
+                
+                // 재생 시작 준비 (모든 말풍선 READY 초기화 및 force-render 일괄 제거)
+                buildPlayItemsQueue(currentCutId);
+                document.querySelectorAll('.speech-bubble').forEach(b => b.classList.remove('force-render'));
+                
+                lastSettledCutId = null; // 오토플레이 안착 판정을 위해 임시 null 처리
+                isSyncScrolling = true; // 스크롤 중 타임라인 중복 기동 차단
+
+                animateScrollTo(endScroll, 600, () => {
+                    isSyncScrolling = false;
+                    lastSettledCutId = currentCutId;
+                    handleScrollUpdate();
+                    
+                    // 안착 완료 지점부터 오토플레이 연출 깨끗하게 기동!
+                    triggerAutoplayForCurrentCut();
+                });
+            }
+        });
+
+        // ================= 📤 작품 데이터 JSON 내보내기 (Export) =================
+        exportJsonBtn.addEventListener('click', () => {
+            restoreEditMode(); // 재생 중인 오디오 등 일체 상태 정리
+
+            const exportedBgms = [];
+            document.querySelectorAll('.bgm-item').forEach(card => {
+                const id = card.dataset.id;
+                const name = card.querySelector('.bgm-name').value;
+                const audioFileInput = card.querySelector('.item-audio-file');
+                let audioUrl = "";
+                if (audioFileInput && audioFileInput.files && audioFileInput.files[0]) {
+                    audioUrl = audioFileInput.files[0].name;
+                } else if (card.audioUrl && !card.audioUrl.startsWith('blob:')) {
+                    audioUrl = card.audioUrl;
+                } else {
+                    audioUrl = card.audioName || "";
+                }
+                const startCut = parseInt(card.querySelector('.bgm-start-cut').value) || 1;
+                const endCut = parseInt(card.querySelector('.bgm-end-cut').value) || 1;
+                const startTime = parseFloat(card.querySelector('.item-start').value) || 0.0;
+                
+                exportedBgms.push({
+                    id, name, audioUrl, startCut, endCut, startTime
+                });
+            });
+
+            const exportedCuts = cuts.map(cut => {
+                const cleanLayer = (layer) => {
+                    if (!layer) return null;
+                    return {
+                        url: layer.name,
+                        name: layer.name,
+                        type: layer.type
+                    };
+                };
+
+                const items = [];
+                const sceneList = document.getElementById(`sceneList_${cut.id}`);
+                if (sceneList) {
+                    // 1. 대사 수집
+                    sceneList.querySelectorAll('.dialogue-item').forEach(card => {
+                        const id = card.dataset.id;
+                        const charName = card.querySelector('.diag-char-name').value;
+                        const charColor = card.querySelector('.diag-color').value;
+                        const text = card.querySelector('.diag-text').value;
+                        const start = parseFloat(card.querySelector('.diag-start').value) || 0.0;
+                        const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
+                        const x = parseFloat(card.querySelector('.diag-x').value) || 10.0;
+                        const y = parseFloat(card.querySelector('.diag-y').value) || 20.0;
+
+                        const baseAngle = parseFloat(card.dataset.baseAngle) || 45;
+                        const tipDx = parseFloat(card.dataset.tipDx) || 30;
+                        const tipDy = parseFloat(card.dataset.tipDy) || 30;
+                        const baseWidth = parseFloat(card.dataset.baseWidth) || 14;
+
+                        const audioFileInput = card.querySelector('.item-audio-file');
+                        let audioUrl = "";
+                        if (audioFileInput && audioFileInput.files && audioFileInput.files[0]) {
+                            audioUrl = audioFileInput.files[0].name;
+                        } else if (card.audioUrl && !card.audioUrl.startsWith('blob:')) {
+                            audioUrl = card.audioUrl;
+                        } else {
+                            audioUrl = card.audioName || "";
+                        }
+
+                        items.push({
+                            id,
+                            type: 'dialogue',
+                            charName,
+                            charColor,
+                            text,
+                            audioUrl,
+                            start,
+                            duration,
+                            x,
+                            y,
+                            baseAngle,
+                            tipDx,
+                            tipDy,
+                            baseWidth
+                        });
+                    });
+
+                    // 2. 효과음 수집
+                    sceneList.querySelectorAll('.sfx-item').forEach(card => {
+                        const id = card.dataset.id;
+                        const start = parseFloat(card.querySelector('.diag-start').value) || 0.0;
+                        const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
+                        const sfxName = card.querySelector('.form-row input[type="text"]').value;
+
+                        const audioFileInput = card.querySelector('.item-audio-file');
+                        let audioUrl = "";
+                        if (audioFileInput && audioFileInput.files && audioFileInput.files[0]) {
+                            audioUrl = audioFileInput.files[0].name;
+                        } else if (card.audioUrl && !card.audioUrl.startsWith('blob:')) {
+                            audioUrl = card.audioUrl;
+                        } else {
+                            audioUrl = card.audioName || "";
+                        }
+
+                        items.push({
+                            id,
+                            type: 'sfx',
+                            name: sfxName,
+                            audioUrl,
+                            start,
+                            duration
+                        });
+                    });
+                }
+
+                return {
+                    id: cut.id,
+                    index: cut.index,
+                    layer1: cleanLayer(cut.layer1),
+                    layer2: cleanLayer(cut.layer2),
+                    layer3: cleanLayer(cut.layer3),
+                    bgImage: cut.layer3 ? cut.layer3.name : null,
+                    bgImageName: cut.layer3 ? cut.layer3.name : null,
+                    effectType: cut.effectType || 'none',
+                    items: items
+                };
+            });
+
+            const projectData = {
+                version: "2.0",
+                bgms: exportedBgms,
+                cuts: exportedCuts
+            };
+
+            const jsonStr = JSON.stringify(projectData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'data.json';
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+
+            showStatus("📥 작품 데이터가 data.json 파일로 내보내기 되었습니다!");
+        });
+
+        // ================= 데이터-DOM 바인딩 무결성 동기화 엔진 =================
+        function syncEditorUI() {
+            // cuts 배열에 담긴 데이터를 편집기 입력 폼 및 뷰어 돔과 물리적으로 완전히 일치시킴
+            cuts.forEach(cut => {
+                const sceneList = document.getElementById(`sceneList_${cut.id}`);
+                const bubbleContainer = document.getElementById(`bubbleContainer_${cut.id}`);
+                if (!sceneList || !bubbleContainer) return;
+
+                // 컷의 연출 효과 동기화
+                const cutItem = document.getElementById(`viewerCut_${cut.id}`);
+                if (cutItem) {
+                    renderCutLayers(cutItem, cut);
+                    syncCutActiveClasses(cut.id);
+                }
+
+                // 대사 및 SFX 데이터 입력 필드와 말풍선 DOM 동기화
+                if (cut.items) {
+                    cut.items.forEach(item => {
+                        if (item.type === 'dialogue') {
+                            let card = sceneList.querySelector(`.dialogue-item[data-id="${item.id}"]`);
+                            let bubble = bubbleContainer.querySelector(`.speech-bubble[data-card-id="${item.id}"]`);
+                            
+                            if (card && bubble) {
+                                // 카드 인풋 필드 동기화
+                                const nameInput = card.querySelector('.diag-char-name');
+                                const colorInput = card.querySelector('.diag-color');
+                                const textInput = card.querySelector('.diag-text');
+                                const xInput = card.querySelector('.diag-x');
+                                const yInput = card.querySelector('.diag-y');
+                                const startInput = card.querySelector('.diag-start');
+                                const durationInput = card.querySelector('.diag-duration');
+
+                                if (nameInput) nameInput.value = item.charName || '';
+                                if (colorInput) colorInput.value = item.charColor || '#ffffff';
+                                if (textInput) textInput.value = item.text || '';
+                                if (xInput) xInput.value = item.x || '10';
+                                if (yInput) yInput.value = item.y || '20';
+                                if (startInput) startInput.value = item.start || '0.5';
+                                if (durationInput) durationInput.value = item.duration || '2.0';
+
+                                // 말풍선 DOM 동기화
+                                const textLayer = bubble.querySelector('.bubble-text-layer');
+                                if (textLayer) {
+                                    textLayer.textContent = item.text || '(대사 대기중)';
+                                }
+                                bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
+                                bubble.style.setProperty('--text-color', getContrastYIQ(item.charColor));
+                                bubble.style.left = `${item.x}%`;
+                                bubble.style.top = `${item.y}%`;
+                                updateTail(bubble);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // ================= 초기 데이터 세팅 및 강제 렌더링 =================
+        function loadDefaultData() {
+            // 1. 기본 1컷 생성
+            const initialCutId = createCut();
+            
+            // 2. 기본 대사 추가
+            const initialCard = addDialogue({ 
+                charName: "주인공", 
+                charColor: "#ffffff", 
+                text: "다중 컷 편집기 가동 시작!", 
+                start: "0.5", 
+                duration: "1.5", 
+                x: "15", 
+                y: "20", 
+                baseAngle: 60, 
+                tipDx: 50, 
+                tipDy: 50 
+            });
+            
+            // [초기 상태 지정] 최초 로드된 1컷 ID를 Settled 캐시에 등록
+            if (cuts.length > 0) {
+                lastSettledCutId = cuts[0].id;
+                currentCutId = cuts[0].id;
+            }
+
+            // 3. 데이터-DOM 최우선 바인딩 동기화 기동
+            syncEditorUI();
+
+            // 4. 초기 렌더링 루프 강제화 (Immediate Render Trigger)
+            if (typeof handleScrollUpdate === 'function') {
+                handleScrollUpdate();
+            }
+        }
+
+        // ================= 초기 샘플 데이터 =================
+        window.addEventListener('DOMContentLoaded', () => {
+            loadDefaultData();
+        });
+
+        // ================= [빨리감기] Double-click/tap and Hold 제스처 처리 =================
+        let lastMouseDownTime = 0;
+        let lastTouchStartTime = 0;
+
+        // 마우스 왼쪽 버튼 더블클릭 홀드 (웹/캔버스 환경)
+        viewerScrollContainer.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // 왼쪽 클릭만
+            const now = performance.now();
+            if (now - lastMouseDownTime < 300) {
+                // 더블클릭 감지 -> 2번째 클릭을 떼지 않는 Hold 상태 시작!
+                isFastForwarding = true;
+                speedMultiplier = 4.0;
+                updatePlayingAudiosPlaybackRate();
+                showStatus("⏩ 빨리 감기 진행 중 (4.0x)...");
+            }
+            lastMouseDownTime = now;
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            if (isFastForwarding) {
+                isFastForwarding = false;
+                speedMultiplier = 1.0;
+                updatePlayingAudiosPlaybackRate();
+                showStatus("▶ 정상 속도 재생 (1.0x)");
+            }
+        });
+
+        // 스마트폰 터치 더블탭 홀드 (모바일/스마트폰 환경)
+        viewerScrollContainer.addEventListener('touchstart', (e) => {
+            const now = performance.now();
+            if (now - lastTouchStartTime < 300) {
+                // 더블탭 감지 -> 2번째 터치를 떼지 않는 Hold 상태 시작!
+                isFastForwarding = true;
+                speedMultiplier = 4.0;
+                updatePlayingAudiosPlaybackRate();
+                showStatus("⏩ 빨리 감기 진행 중 (4.0x)...");
+            }
+            lastTouchStartTime = now;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (isFastForwarding) {
+                isFastForwarding = false;
+                speedMultiplier = 1.0;
+                updatePlayingAudiosPlaybackRate();
+                showStatus("▶ 정상 속도 재생 (1.0x)");
+            }
+        });
+
+        window.addEventListener('touchcancel', (e) => {
+            if (isFastForwarding) {
+                isFastForwarding = false;
+                speedMultiplier = 1.0;
+                updatePlayingAudiosPlaybackRate();
+                showStatus("▶ 정상 속도 재생 (1.0x)");
+            }
+        });
+    </script>
+</body>
+</html>

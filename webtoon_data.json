@@ -1,0 +1,178 @@
+{
+  "title": "대항해시대: 푸른 심연의 부름 (The Call of the Blue Abyss)",
+  "cuts": [
+    {
+      "id": 1,
+      "backgroundImage": "./자료/1.jpg",
+      "duration": 7000,
+      "camera": {
+        "startX": 0,
+        "startY": 0,
+        "startScale": 1.0,
+        "endX": -20,
+        "endY": -10,
+        "endScale": 1.15,
+        "startTime": 0,
+        "duration": 7000
+      },
+      "audios": [
+        {
+          "id": "bgm_cut1",
+          "src": "./자료/Uncharted Waters - 01 Opening.mp3",
+          "startTime": 0,
+          "loop": true,
+          "volume": 0.5,
+          "type": "bgm"
+        },
+        {
+          "id": "sfx_cut1",
+          "src": "./자료/녹음.m4a",
+          "startTime": 2500,
+          "loop": false,
+          "volume": 0.8,
+          "type": "sfx"
+        }
+      ],
+      "bubbles": [
+        {
+          "id": "b1_1",
+          "text": "이 넓은 바다 어딘가에...",
+          "x": 15,
+          "y": 20,
+          "startTime": 1000,
+          "charInterval": 100,
+          "style": "thought",
+          "color": "#e2e8f0",
+          "backgroundColor": "rgba(15, 23, 42, 0.85)",
+          "borderColor": "#8b5cf6"
+        },
+        {
+          "id": "b1_2",
+          "text": "전설 속의 황금 도시가 실제로 존재할까?",
+          "x": 20,
+          "y": 32,
+          "startTime": 2500,
+          "charInterval": 80,
+          "style": "thought",
+          "color": "#e2e8f0",
+          "backgroundColor": "rgba(15, 23, 42, 0.85)",
+          "borderColor": "#8b5cf6"
+        },
+        {
+          "id": "b1_3",
+          "text": "기다려라, 내가 반드시 찾아낼 테니까!",
+          "x": 55,
+          "y": 65,
+          "startTime": 4500,
+          "charInterval": 60,
+          "style": "shout",
+          "color": "#ffffff",
+          "backgroundColor": "rgba(220, 38, 38, 0.9)",
+          "borderColor": "#f43f5e"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "backgroundImage": "./자료/2.jpg",
+      "duration": 8000,
+      "camera": {
+        "startX": 10,
+        "startY": 10,
+        "startScale": 1.2,
+        "endX": 0,
+        "endY": 0,
+        "endScale": 1.0,
+        "startTime": 0,
+        "duration": 8000
+      },
+      "audios": [
+        {
+          "id": "bgm_cut2",
+          "src": "./자료/대항해시대2 Ost - Menu Theme(AI).mp3",
+          "startTime": 0,
+          "loop": true,
+          "volume": 0.5,
+          "type": "bgm"
+        }
+      ],
+      "bubbles": [
+        {
+          "id": "b2_1",
+          "text": "폭풍우가 몰아치는 바다...",
+          "x": 45,
+          "y": 15,
+          "startTime": 1200,
+          "charInterval": 80,
+          "style": "modern",
+          "color": "#f8fafc",
+          "backgroundColor": "rgba(30, 41, 59, 0.9)",
+          "borderColor": "#06b6d4"
+        },
+        {
+          "id": "b2_2",
+          "text": "키를 잡아라! 여기서 무너지면 끝장이다!",
+          "x": 30,
+          "y": 70,
+          "startTime": 3200,
+          "charInterval": 50,
+          "style": "shout",
+          "color": "#ffffff",
+          "backgroundColor": "rgba(239, 68, 68, 0.95)",
+          "borderColor": "#ea580c"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "backgroundImage": "./자료/3.jpg",
+      "duration": 9000,
+      "camera": {
+        "startX": -20,
+        "startY": 20,
+        "startScale": 1.1,
+        "endX": 20,
+        "endY": -10,
+        "endScale": 1.3,
+        "startTime": 0,
+        "duration": 9000
+      },
+      "audios": [
+        {
+          "id": "bgm_cut3",
+          "src": "./자료/대항해시대2(1995)dos bgm.mp3",
+          "startTime": 0,
+          "loop": true,
+          "volume": 0.4,
+          "type": "bgm"
+        }
+      ],
+      "bubbles": [
+        {
+          "id": "b3_1",
+          "text": "마침내 안개가 걷히고...",
+          "x": 20,
+          "y": 20,
+          "startTime": 1500,
+          "charInterval": 120,
+          "style": "thought",
+          "color": "#e2e8f0",
+          "backgroundColor": "rgba(15, 23, 42, 0.8)",
+          "borderColor": "#a855f7"
+        },
+        {
+          "id": "b3_2",
+          "text": "신대륙이 모습을 드러냈다.",
+          "x": 40,
+          "y": 50,
+          "startTime": 4000,
+          "charInterval": 100,
+          "style": "modern",
+          "color": "#ffffff",
+          "backgroundColor": "rgba(9, 9, 11, 0.9)",
+          "borderColor": "#10b981"
+        }
+      ]
+    }
+  ]
+}

@@ -456,6 +456,11 @@ function handleScrollUpdate() {
         }
 
         buildPlayItemsQueue(bestCutId);
+
+        // [성능 개선 1 - Lazy Rendering Swap 기동]
+        if (typeof swapActiveCutsDOM === 'function') {
+            swapActiveCutsDOM(bestCutId);
+        }
     }
 
     sandboxOtherCuts(bestCutId);
@@ -494,9 +499,7 @@ function handleScrollUpdate() {
     });
 
     if (!playAnimationId) {
-        const mySessionId = Math.random();
-        activeSessionId = mySessionId;
-        updateRealtimeTimeline(mySessionId);
+        renderItemsFrame();
     }
 }
 
@@ -669,7 +672,172 @@ function syncCutBubblesState(cutId, state) {
     });
 }
 
-// 60fps 마스터 프레임 스케줄러
+// 1단계 렌더링 프레임 함수 독립화 및 [성능 개선 4 - 타이핑 렌더링 캐싱] 적용
+function renderItemsFrame() {
+    if (!audioPipeManager.ctx) {
+        audioPipeManager.init();
+    }
+    const audioCtx = audioPipeManager.ctx;
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+    }
+    
+    playItemsQueue.forEach(item => {
+        const bubble = item.bubbleDOM;
+        
+        let elapsed = accumulatedTime - item.startSec;
+        if (currentCutId !== lastSettledCutId) {
+            elapsed = -1;
+        }
+        
+        if (elapsed < 0) {
+            item.triggered = false;
+            if (bubble) {
+                const tailSvg = bubble.querySelector('.tail-svg');
+                const paths = bubble.querySelectorAll('.bubble-path');
+                
+                if (bubble.classList.contains('show') || bubble.style.opacity !== '0') {
+                    bubble.style.transition = 'none';
+                    if (tailSvg) tailSvg.style.transition = 'none';
+                    if (paths.length > 0) {
+                        paths.forEach(p => p.style.transition = 'none');
+                    }
+                    
+                    bubble.classList.remove('show');
+                    bubble.style.opacity = '0';
+                    if (tailSvg) tailSvg.style.opacity = '0';
+                    if (paths.length > 0) {
+                        paths.forEach(p => p.style.opacity = '0');
+                    }
+                    
+                    void bubble.offsetWidth;
+                    
+                    bubble.style.transition = '';
+                    if (tailSvg) tailSvg.style.transition = '';
+                    if (paths.length > 0) {
+                        paths.forEach(p => p.style.transition = '');
+                    }
+                    
+                    bubble.classList.add('animate');
+                }
+                const spans = bubble.querySelectorAll('.typing-wrapper span');
+                spans.forEach(s => s.style.opacity = '0');
+            }
+            if (item.audioObj) {
+                item.audioObj.pause();
+                item.audioObj.currentTime = 0;
+            }
+        } 
+        else {
+            item.triggered = true;
+            
+            if (bubble) {
+                const tailSvg = bubble.querySelector('.tail-svg');
+                const paths = bubble.querySelectorAll('.bubble-path');
+                
+                if (!bubble.classList.contains('show') || bubble.style.opacity === '0') {
+                    bubble.style.transition = 'none';
+                    if (tailSvg) tailSvg.style.transition = 'none';
+                    if (paths.length > 0) {
+                        paths.forEach(p => p.style.transition = 'none');
+                    }
+                    
+                    bubble.classList.remove('animate');
+                    bubble.style.opacity = '1';
+                    if (tailSvg) tailSvg.style.opacity = '1';
+                    if (paths.length > 0) {
+                        paths.forEach(p => p.style.opacity = '1');
+                    }
+                    
+                    void bubble.offsetWidth;
+                    
+                    bubble.style.transition = '';
+                    bubble.style.opacity = '';
+                    if (tailSvg) {
+                        tailSvg.style.transition = '';
+                        tailSvg.style.opacity = '';
+                    }
+                    if (paths.length > 0) {
+                        paths.forEach(p => {
+                            p.style.transition = '';
+                            p.style.opacity = '';
+                        });
+                    }
+                    
+                    bubble.classList.add('show');
+                }
+                
+                // [성능 개선 4 - 타이핑 렌더링 캐싱 필터]
+                const spans = bubble.querySelectorAll('.typing-wrapper span');
+                if (spans.length > 0) {
+                    const progressPct = Math.min(1.0, elapsed / item.duration);
+                    const spansToShow = Math.floor(spans.length * progressPct);
+                    
+                    // 캐싱 적용: 이전 프레임과 동일한 개수라면 DOM 갱신 차단
+                    if (item.lastSpansToShow !== spansToShow) {
+                        item.lastSpansToShow = spansToShow;
+                        for (let i = 0; i < spans.length; i++) {
+                            spans[i].style.opacity = (i < spansToShow) ? '1' : '0';
+                        }
+                    }
+                }
+            }
+            
+            if (item.audioUrl) {
+                if (!item.audioObj) {
+                    const audio = new Audio(normalizeMediaPath(item.audioUrl));
+                    audio.autoplay = false;
+                    audio.load();
+                    audioPipeManager.connectAudio(audio, 'voice');
+                    item.audioObj = audio;
+                    if (isFastForwarding) {
+                        audio.playbackRate = 4.0;
+                    } else {
+                        audio.playbackRate = speedMultiplier;
+                    }
+                    playingAudios.push(item.audioObj);
+                }
+                
+                const targetAudioTime = elapsed;
+                const durationLimit = item.audioObj.duration || item.duration;
+                
+                if (targetAudioTime < durationLimit) {
+                    if (isScrollDirectionDown || isTimeBasedAutoplay) {
+                        if (item.audioObj.paused) {
+                            item.audioObj.play().catch(e => console.log("오디오 play 지연:", e));
+                        }
+                        if (Math.abs(item.audioObj.currentTime - targetAudioTime) > 0.2) {
+                            item.audioObj.currentTime = targetAudioTime;
+                        }
+                        item.audioObj.volume = 1.0;
+                    } else {
+                        item.audioObj.pause();
+                        item.audioObj.currentTime = targetAudioTime;
+                    }
+                } else {
+                    item.audioObj.pause();
+                }
+            }
+        }
+    });
+    
+    // 현재 활성화된 컷 내의 이중 타임라인 플레이헤드 갱신 (편집기 모드에서만 실행)
+    const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
+    if (activeSceneList) {
+        activeSceneList.querySelectorAll('.timeline-container').forEach(container => {
+            const playhead = container.querySelector('.timeline-playhead');
+            if (playhead) {
+                playhead.style.opacity = '1';
+                let pct = (accumulatedTime / 10.0) * 100;
+                if (pct > 100) pct = 100;
+                playhead.style.left = `${pct}%`;
+            }
+        });
+    }
+}
+window.renderItemsFrame = renderItemsFrame;
+
+// 60fps 마스터 프레임 스케줄러 (재생 상태일 때만 무한 루프 가동)
 function updateRealtimeTimeline(mySessionId) {
     if (mySessionId !== activeSessionId) {
         return;
@@ -677,6 +845,7 @@ function updateRealtimeTimeline(mySessionId) {
 
     if (!isPlayMode) {
         document.querySelectorAll('.timeline-playhead').forEach(ph => ph.style.opacity = '0');
+        playAnimationId = null; // 루프 플래그 리셋 후 탈출
         return;
     }
     
@@ -712,162 +881,6 @@ function updateRealtimeTimeline(mySessionId) {
         }
     }
     lastFrameTime = now;
-
-    function renderItemsFrame() {
-        if (!audioPipeManager.ctx) {
-            audioPipeManager.init();
-        }
-        const audioCtx = audioPipeManager.ctx;
-        if (audioCtx && audioCtx.state === 'suspended') {
-            audioCtx.resume().catch(() => {});
-        }
-        
-        playItemsQueue.forEach(item => {
-            const bubble = item.bubbleDOM;
-            
-            let elapsed = accumulatedTime - item.startSec;
-            if (currentCutId !== lastSettledCutId) {
-                elapsed = -1;
-            }
-            
-            if (elapsed < 0) {
-                item.triggered = false;
-                if (bubble) {
-                    const tailSvg = bubble.querySelector('.tail-svg');
-                    const paths = bubble.querySelectorAll('.bubble-path');
-                    
-                    if (bubble.classList.contains('show') || bubble.style.opacity !== '0') {
-                        bubble.style.transition = 'none';
-                        if (tailSvg) tailSvg.style.transition = 'none';
-                        if (paths.length > 0) {
-                            paths.forEach(p => p.style.transition = 'none');
-                        }
-                        
-                        bubble.classList.remove('show');
-                        bubble.style.opacity = '0';
-                        if (tailSvg) tailSvg.style.opacity = '0';
-                        if (paths.length > 0) {
-                            paths.forEach(p => p.style.opacity = '0');
-                        }
-                        
-                        void bubble.offsetWidth;
-                        
-                        bubble.style.transition = '';
-                        if (tailSvg) tailSvg.style.transition = '';
-                        if (paths.length > 0) {
-                            paths.forEach(p => p.style.transition = '');
-                        }
-                        
-                        bubble.classList.add('animate');
-                    }
-                    const spans = bubble.querySelectorAll('.typing-wrapper span');
-                    spans.forEach(s => s.style.opacity = '0');
-                }
-                if (item.audioObj) {
-                    item.audioObj.pause();
-                    item.audioObj.currentTime = 0;
-                }
-            } 
-            else {
-                item.triggered = true;
-                
-                if (bubble) {
-                    const tailSvg = bubble.querySelector('.tail-svg');
-                    const paths = bubble.querySelectorAll('.bubble-path');
-                    
-                    if (!bubble.classList.contains('show') || bubble.style.opacity === '0') {
-                        bubble.style.transition = 'none';
-                        if (tailSvg) tailSvg.style.transition = 'none';
-                        if (paths.length > 0) {
-                            paths.forEach(p => p.style.transition = 'none');
-                        }
-                        
-                        bubble.classList.remove('animate');
-                        bubble.style.opacity = '1';
-                        if (tailSvg) tailSvg.style.opacity = '1';
-                        if (paths.length > 0) {
-                            paths.forEach(p => p.style.opacity = '1');
-                        }
-                        
-                        void bubble.offsetWidth;
-                        
-                        bubble.style.transition = '';
-                        bubble.style.opacity = '';
-                        if (tailSvg) {
-                            tailSvg.style.transition = '';
-                            tailSvg.style.opacity = '';
-                        }
-                        if (paths.length > 0) {
-                            paths.forEach(p => {
-                                p.style.transition = '';
-                                p.style.opacity = '';
-                            });
-                        }
-                        
-                        bubble.classList.add('show');
-                    }
-                    
-                    const spans = bubble.querySelectorAll('.typing-wrapper span');
-                    if (spans.length > 0) {
-                        const progressPct = Math.min(1.0, elapsed / item.duration);
-                        const spansToShow = Math.floor(spans.length * progressPct);
-                        
-                        for (let i = 0; i < spans.length; i++) {
-                            spans[i].style.opacity = (i < spansToShow) ? '1' : '0';
-                        }
-                    }
-                }
-                
-                if (item.audioUrl) {
-                    if (!item.audioObj) {
-                        const audio = new Audio(normalizeMediaPath(item.audioUrl));
-                        audioPipeManager.connectAudio(audio, 'voice');
-                        item.audioObj = audio;
-                        if (isFastForwarding) {
-                            audio.playbackRate = 4.0;
-                        } else {
-                            audio.playbackRate = speedMultiplier;
-                        }
-                        playingAudios.push(item.audioObj);
-                    }
-                    
-                    const targetAudioTime = elapsed;
-                    const durationLimit = item.audioObj.duration || item.duration;
-                    
-                    if (targetAudioTime < durationLimit) {
-                        if (isScrollDirectionDown || isTimeBasedAutoplay) {
-                            if (item.audioObj.paused) {
-                                item.audioObj.play().catch(e => console.log("오디오 play 지연:", e));
-                            }
-                            if (Math.abs(item.audioObj.currentTime - targetAudioTime) > 0.2) {
-                                item.audioObj.currentTime = targetAudioTime;
-                            }
-                            item.audioObj.volume = 1.0;
-                        } else {
-                            item.audioObj.pause();
-                            item.audioObj.currentTime = targetAudioTime;
-                        }
-                    } else {
-                        item.audioObj.pause();
-                    }
-                }
-            }
-        });
-        
-        // 현재 활성화된 컷 내의 이중 타임라인 플레이헤드 갱신 (편집기 모드에서만 실행)
-        const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
-        if (activeSceneList) {
-            activeSceneList.querySelectorAll('.timeline-container').forEach(container => {
-                const playhead = container.querySelector('.timeline-playhead');
-                if (playhead) {
-                    playhead.style.opacity = '1';
-                    let pct = (accumulatedTime / 10.0) * 100;
-                    if (pct > 100) pct = 100;
-                    playhead.style.left = `${pct}%`;
-                }
-            });
-        }
-    }
 
     renderItemsFrame();
 
@@ -1200,6 +1213,12 @@ function prepareBubbleTyping(bubble, text) {
     const textLayer = bubble.querySelector('.bubble-text-layer');
     if (!textLayer) return;
 
+    // [성능 개선 5 - prepareBubbleTyping 텍스트 캐싱]
+    if (bubble.lastPreparedText === text) {
+        return;
+    }
+    bubble.lastPreparedText = text;
+
     // 강제 초기 상태 청소 (번쩍임 예방 및 opacity=0 락 적용)
     bubble.style.transition = 'none';
     bubble.style.opacity = '0';
@@ -1394,4 +1413,232 @@ function normalizeAndMapProjectData(data) {
 window.normalizeAndMapProjectData = normalizeAndMapProjectData;
 window.normalizeProjectDataPaths = normalizeProjectDataPaths;
 window.mapObjectProperties = mapObjectProperties;
+
+// =========================================================================
+// 🚀 [성능 개선 1 & 3] Lazy Rendering, Swap 및 이미지 풀링 핵심 모듈 (viewer.js)
+// =========================================================================
+
+// 명암 대비 색상 계산기 (Contrast YIQ)
+function getContrastYIQ(hexcolor){
+    if(!hexcolor) return '#111827';
+    hexcolor = hexcolor.replace("#", "");
+    var r = parseInt(hexcolor.substr(0,2),16);
+    var g = parseInt(hexcolor.substr(2,2),16);
+    var b = parseInt(hexcolor.substr(4,2),16);
+    var yiq = ((r*299)+(g*587)+(b*114))/1000;
+    return (yiq >= 128) ? '#111827' : '#ffffff'; 
+}
+window.getContrastYIQ = getContrastYIQ;
+
+// 말풍선 DOM 동적 생성기 (Swap-in 용)
+function createBubbleDOM(cutId, item) {
+    const bubble = document.createElement('div');
+    bubble.className = 'speech-bubble show';
+    bubble.id = `bubble_${item.id}`;
+    bubble.dataset.cardId = item.id;
+    bubble.style.left = `${item.x}%`;
+    bubble.style.top = `${item.y}%`;
+    bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
+    bubble.style.setProperty('--text-color', getContrastYIQ(item.charColor || '#ffffff'));
+
+    // 실시간 말꼬리 렌더링에 필요한 물리 속성들을 데이터셋으로 바인딩
+    bubble.dataset.baseAngle = item.baseAngle || 45;
+    bubble.dataset.tipDx = item.tipDx || 30;
+    bubble.dataset.tipDy = item.tipDy || 30;
+    bubble.dataset.baseWidth = item.baseWidth || 14;
+
+    bubble.innerHTML = `
+        <div class="bubble-shadow-layer"></div>
+        <div class="bubble-bg-cover"></div>
+        <svg class="tail-svg" viewBox="0 0 1000 1000" width="1000" height="1000" style="opacity: 1;">
+            <path class="bubble-path bubble-path-fill" d="" style="fill: var(--bubble-color); stroke: none; opacity: 1;" />
+            <path class="bubble-path bubble-path-stroke" d="" style="fill: none; stroke: #111827; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; opacity: 1;" />
+        </svg>
+        <div class="bubble-text-layer">${item.text || ''}</div>
+        <div class="handle base-handle" title="뿌리 조절"></div><div class="handle tip-handle" title="꼬리 끝 조절"></div>
+    `;
+
+    // 꼬리 그리기 함수 호출
+    if (typeof updateTail === 'function') {
+        setTimeout(() => updateTail(bubble), 0);
+    } else if (typeof updateTailRuntime === 'function') {
+        setTimeout(() => updateTailRuntime(bubble, item.baseAngle, item.tipDx, item.tipDy, item.baseWidth), 0);
+    }
+    
+    // ResizeObserver 바인딩
+    const observer = window.resizeObserver;
+    if (observer) {
+        observer.observe(bubble);
+    }
+
+    return bubble;
+}
+window.createBubbleDOM = createBubbleDOM;
+
+// Active Cut 중심 Lazy Rendering & Swap 및 이미지 풀링 시스템
+function swapActiveCutsDOM(activeCutId) {
+    if (!cuts || cuts.length === 0) return;
+    
+    const activeCutIdx = cuts.findIndex(c => c.id === activeCutId);
+    if (activeCutIdx === -1) return;
+
+    // 활성 윈도우 범위 결정 (활성 컷 + 앞/뒤 1컷)
+    const windowStart = Math.max(0, activeCutIdx - 1);
+    const windowEnd = Math.min(cuts.length - 1, activeCutIdx + 1);
+
+    cuts.forEach((cut, idx) => {
+        const cutItem = document.getElementById(`viewerCut_${cut.id}`);
+        if (!cutItem) return;
+
+        const inWindow = idx >= windowStart && idx <= windowEnd;
+
+        if (inWindow) {
+            // Swap-in: 활성 범위에 속한 경우
+            // 1. 3중 레이어 생성
+            const hasLayers = cutItem.querySelector('.cut-layer, .cut-bg-image');
+            if (!hasLayers) {
+                if (typeof renderCutLayers === 'function') {
+                    renderCutLayers(cutItem, cut);
+                } else {
+                    // viewer.html용 레이어 생성 폴백
+                    buildViewerLayersFallback(cutItem, cut);
+                }
+            }
+
+            // 2. 말풍선 컨테이너 및 말풍선 DOM 생성
+            let bubbleContainer = cutItem.querySelector('.bubble-container');
+            if (!bubbleContainer) {
+                bubbleContainer = document.createElement('div');
+                bubbleContainer.className = 'bubble-container';
+                bubbleContainer.id = `bubbleContainer_${cut.id}`;
+                cutItem.appendChild(bubbleContainer);
+            }
+
+            // 각 대사 아이템에 대해 말풍선 DOM 생성
+            const dialogueItems = (cut.items || []).filter(item => item.type === 'dialogue');
+            dialogueItems.forEach(item => {
+                let bubble = document.getElementById(`bubble_${item.id}`) || bubbleContainer.querySelector(`[data-card-id="${item.id}"]`);
+                if (!bubble) {
+                    bubble = createBubbleDOM(cut.id, item);
+                    bubbleContainer.appendChild(bubble);
+                }
+                
+                // 편집기 카드 바인딩 동기화
+                const card = document.querySelector(`.dialogue-item[data-id="${item.id}"]`);
+                if (card) {
+                    card.bubbleDOM = bubble;
+                }
+            });
+        } else {
+            // Swap-out (비활성 컷): 이미지 풀링 & 메모리 해제
+            // 1. 비디오 해제 및 레이어 DOM 제거
+            const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
+            layers.forEach(layer => {
+                if (layer.tagName === 'VIDEO') {
+                    try {
+                        layer.pause();
+                        layer.src = "";
+                        layer.load();
+                    } catch(e) {}
+                }
+                layer.remove();
+            });
+
+            // 2. 말풍선 DOM 및 컨테이너 비우기
+            const bubbleContainer = cutItem.querySelector('.bubble-container');
+            if (bubbleContainer) {
+                const observer = window.resizeObserver;
+                bubbleContainer.querySelectorAll('.speech-bubble').forEach(bubble => {
+                    if (observer) {
+                        try {
+                            observer.unobserve(bubble);
+                        } catch(e) {}
+                    }
+                });
+                bubbleContainer.innerHTML = "";
+            }
+
+            // 3. 씬 리스트 카드의 bubbleDOM 해제
+            const dialogueItems = (cut.items || []).filter(item => item.type === 'dialogue');
+            dialogueItems.forEach(item => {
+                const card = document.querySelector(`.dialogue-item[data-id="${item.id}"]`);
+                if (card) {
+                    card.bubbleDOM = null;
+                }
+            });
+        }
+    });
+}
+window.swapActiveCutsDOM = swapActiveCutsDOM;
+
+// viewer.html용 레이어 생성 헬퍼
+function buildViewerLayersFallback(cutItem, c) {
+    function buildLayer(layerIndex, layerObj) {
+        if (!layerObj || !layerObj.url) return null;
+
+        let el;
+        if (layerObj.type === 'video') {
+            el = document.createElement('video');
+            el.src = normalizeMediaPath(layerObj.url);
+            el.autoplay = true;
+            el.loop = true;
+            el.muted = true;
+            el.playsinline = true;
+            el.setAttribute('autoplay', '');
+            el.setAttribute('loop', '');
+            el.setAttribute('muted', '');
+            el.setAttribute('playsinline', '');
+
+            // 첫 번째 컷(Index 1) 비디오 로드 완료 감시
+            if (c.index === 1) {
+                el.addEventListener('loadeddata', () => {
+                    cutItem.style.transition = 'opacity 0.3s ease';
+                    cutItem.style.opacity = '1';
+                });
+            }
+        } else {
+            el = document.createElement('div');
+            el.style.backgroundImage = `url(${normalizeMediaPath(layerObj.url)})`;
+
+            // 첫 번째 컷(Index 1) 이미지 로드 완료 감시
+            if (c.index === 1) {
+                const img = new Image();
+                img.onload = () => {
+                    cutItem.style.transition = 'opacity 0.3s ease';
+                    cutItem.style.opacity = '1';
+                };
+                img.src = normalizeMediaPath(layerObj.url);
+            }
+        }
+
+        el.className = 'cut-layer';
+        el.dataset.layer = layerIndex;
+
+        // Stacking order
+        if (layerIndex === 3) el.style.zIndex = '1';
+        else if (layerIndex === 2) el.style.zIndex = '2';
+        else if (layerIndex === 1) el.style.zIndex = '3';
+
+        // 연출 효과 타입 적용
+        if (c.effectType && c.effectType !== 'none' && c.effectType !== 'shake') {
+            el.classList.add(`effect-${c.effectType}`);
+        }
+
+        return el;
+    }
+
+    const l3 = buildLayer(3, c.layer3 || (c.bgImage ? { url: c.bgImage, name: c.bgImageName || '배경', type: 'image' } : null));
+    const l2 = buildLayer(2, c.layer2);
+    const l1 = buildLayer(1, c.layer1);
+
+    const bubbleContainer = cutItem.querySelector('.bubble-container');
+
+    if (l3) cutItem.insertBefore(l3, bubbleContainer || null);
+    if (l2) cutItem.insertBefore(l2, bubbleContainer || null);
+    if (l1) cutItem.insertBefore(l1, bubbleContainer || null);
+
+    if (c.effectType === 'shake') {
+        cutItem.classList.add('effect-shake');
+    }
+}
 

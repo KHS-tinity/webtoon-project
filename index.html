@@ -458,6 +458,26 @@
         var lastFrameTime = window.lastFrameTime = window.lastFrameTime || 0;           // 신규: 시간 기반 프레임 연출 갱신용 타임스탬프
         var isProgrammaticPlaying = window.isProgrammaticPlaying = window.isProgrammaticPlaying || false; // 신규: 재생(Play) 버튼을 통한 programmatic 재생 중 플래그
 
+        // [성능 개선 2 - 데이터 동기화 헬퍼 함수]
+        function updateCutItemData(cutId, itemId, updatedProperties) {
+            const cut = cuts.find(c => c.id === cutId);
+            if (!cut) return;
+            if (!cut.items) cut.items = [];
+            const item = cut.items.find(i => i.id === itemId);
+            if (item) {
+                Object.assign(item, updatedProperties);
+            } else {
+                cut.items.push({ id: itemId, ...updatedProperties });
+            }
+        }
+        function deleteCutItemData(cutId, itemId) {
+            const cut = cuts.find(c => c.id === cutId);
+            if (!cut) return;
+            if (cut.items) {
+                cut.items = cut.items.filter(i => i.id !== itemId);
+            }
+        }
+
         // [신규] 3중 레이어 (캐릭터, 소품, 배경) 비디오/이미지 혼합 오버레이 동적 렌더러
         function renderCutLayers(cutItem, cutData) {
             // 기존에 생성되어 있던 레이어 엘리먼트들 일괄 소멸
@@ -531,7 +551,8 @@
                     layer1: null, // 캐릭터 { url, name, type }
                     layer2: null, // 소품 { url, name, type }
                     layer3: null, // 배경 { url, name, type }
-                    effectType: 'none'
+                    effectType: 'none',
+                    items: []
                 };
                 cuts.push(cutData);
 
@@ -677,6 +698,11 @@
                 stopAllAudios();
 
                 currentCutId = cutId;
+                
+                // [성능 개선 1 - Lazy Rendering Swap 기동]
+                if (typeof swapActiveCutsDOM === 'function') {
+                    swapActiveCutsDOM(cutId);
+                }
                 
                 // 1. 좌측 컷 선택 탭 클래스 토글
                 document.querySelectorAll('.cut-tab').forEach(btn => {
@@ -1183,6 +1209,12 @@
                                 durationInput.dispatchEvent(new Event('input')); // 슬라이더 연동 실시간 싱크 유발
                             }
                         }
+                        // [데이터 동기화]
+                        const itemId = card.dataset.id;
+                        updateCutItemData(currentCutId, itemId, {
+                            audioUrl: card.audioUrl,
+                            duration: tempAudio.duration
+                        });
                         showStatus(`"${file.name}" 로드 완료! (길이: ${tempAudio.duration.toFixed(2)}초)`);
                     });
                 }
@@ -1461,17 +1493,43 @@
                 const color = card.querySelector('.diag-color').value;
                 const x = card.querySelector('.diag-x').value;
                 const y = card.querySelector('.diag-y').value;
+                const start = parseFloat(card.querySelector('.diag-start').value) || 0.0;
+                const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
 
-                bubble.querySelector('.bubble-text-layer').textContent = text || '(대사 대기중)';
-                bubble.style.setProperty('--bubble-color', color);
-                bubble.style.setProperty('--text-color', getContrastYIQ(color));
-                bubble.style.left = `${x}%`; bubble.style.top = `${y}%`;
-                updateTail(bubble);
+                // [데이터 동기화]
+                updateCutItemData(currentCutId, id, {
+                    type: 'dialogue',
+                    charName: cName,
+                    charColor: color,
+                    text: text,
+                    start: start,
+                    duration: duration,
+                    x: parseFloat(x) || 0.0,
+                    y: parseFloat(y) || 0.0,
+                    baseAngle: parseFloat(card.dataset.baseAngle) || 45,
+                    tipDx: parseFloat(card.dataset.tipDx) || 30,
+                    tipDy: parseFloat(card.dataset.tipDy) || 30,
+                    baseWidth: parseFloat(card.dataset.baseWidth) || 14,
+                    audioUrl: card.audioUrl || ""
+                });
+
+                if (bubble) {
+                    bubble.querySelector('.bubble-text-layer').textContent = text || '(대사 대기중)';
+                    bubble.style.setProperty('--bubble-color', color);
+                    bubble.style.setProperty('--text-color', getContrastYIQ(color));
+                    bubble.style.left = `${x}%`; bubble.style.top = `${y}%`;
+                    updateTail(bubble);
+                }
             };
 
             card.querySelectorAll('input, textarea').forEach(input => input.addEventListener('input', updateBubbleUI));
             card.addEventListener('mousedown', () => { document.querySelectorAll('.speech-bubble').forEach(b => b.classList.remove('selected')); bubble.classList.add('selected'); });
-            card.querySelector('.diag-delete-btn').addEventListener('click', () => { resizeObserver.unobserve(bubble); card.remove(); bubble.remove(); });
+            card.querySelector('.diag-delete-btn').addEventListener('click', () => { 
+                resizeObserver.unobserve(bubble); 
+                card.remove(); 
+                bubble.remove(); 
+                deleteCutItemData(currentCutId, id);
+            });
 
             updateBubbleUI();
             card.bubbleDOM = bubble;
@@ -1530,8 +1588,29 @@
             if (activeSceneList) activeSceneList.appendChild(card);
             handleAudioUpload(card.querySelector('.item-audio-file'), card, '.diag-duration');
             initTimelineSlider(card); // 타임라인 드래그 기능 기동
+
+            const updateSfxUI = () => {
+                const sfxName = card.querySelector('.form-row input[type="text"]').value;
+                const start = parseFloat(card.querySelector('.diag-start').value) || 0.0;
+                const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
+
+                // [데이터 동기화]
+                updateCutItemData(currentCutId, id, {
+                    type: 'sfx',
+                    name: sfxName,
+                    start: start,
+                    duration: duration,
+                    audioUrl: card.audioUrl || ""
+                });
+            };
+
+            card.querySelectorAll('input').forEach(input => input.addEventListener('input', updateSfxUI));
+            card.querySelector('.diag-delete-btn').addEventListener('click', () => { 
+                card.remove(); 
+                deleteCutItemData(currentCutId, id);
+            });
             
-            card.querySelector('.diag-delete-btn').addEventListener('click', () => card.remove());
+            updateSfxUI();
         }
 
         // ================= 글로벌 BGM 오디오 관리 상태 및 제어 함수 =================
@@ -1882,6 +1961,16 @@
             if (tipHandle) {
                 tipHandle.style.left = `${tx - 500}px`;
                 tipHandle.style.top = `${ty - 500}px`;
+            }
+
+            // [데이터 동기화] 드래그 등으로 변경된 꼬리 기하 속성을 메모리 데이터에도 연동
+            if (typeof updateCutItemData === 'function') {
+                updateCutItemData(currentCutId, cardId, {
+                    baseAngle: baseAngle,
+                    tipDx: tipDx,
+                    tipDy: tipDy,
+                    baseWidth: baseWidth
+                });
             }
         }
 
@@ -2423,80 +2512,36 @@
                     };
                 };
 
-                const items = [];
-                const sceneList = document.getElementById(`sceneList_${cut.id}`);
-                if (sceneList) {
-                    // 1. 대사 수집
-                    sceneList.querySelectorAll('.dialogue-item').forEach(card => {
-                        const id = card.dataset.id;
-                        const charName = card.querySelector('.diag-char-name').value;
-                        const charColor = card.querySelector('.diag-color').value;
-                        const text = card.querySelector('.diag-text').value;
-                        const start = parseFloat(card.querySelector('.diag-start').value) || 0.0;
-                        const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
-                        const x = parseFloat(card.querySelector('.diag-x').value) || 10.0;
-                        const y = parseFloat(card.querySelector('.diag-y').value) || 20.0;
-
-                        const baseAngle = parseFloat(card.dataset.baseAngle) || 45;
-                        const tipDx = parseFloat(card.dataset.tipDx) || 30;
-                        const tipDy = parseFloat(card.dataset.tipDy) || 30;
-                        const baseWidth = parseFloat(card.dataset.baseWidth) || 14;
-
-                        const audioFileInput = card.querySelector('.item-audio-file');
-                        let audioUrl = "";
-                        if (audioFileInput && audioFileInput.files && audioFileInput.files[0]) {
-                            audioUrl = audioFileInput.files[0].name;
-                        } else if (card.audioUrl && !card.audioUrl.startsWith('blob:')) {
-                            audioUrl = card.audioUrl;
-                        } else {
-                            audioUrl = card.audioName || "";
-                        }
-
-                        items.push({
-                            id,
+                const cleanItems = (cut.items || []).map(item => {
+                    if (item.type === 'dialogue') {
+                        return {
+                            id: item.id,
                             type: 'dialogue',
-                            charName,
-                            charColor,
-                            text,
-                            audioUrl,
-                            start,
-                            duration,
-                            x,
-                            y,
-                            baseAngle,
-                            tipDx,
-                            tipDy,
-                            baseWidth
-                        });
-                    });
-
-                    // 2. 효과음 수집
-                    sceneList.querySelectorAll('.sfx-item').forEach(card => {
-                        const id = card.dataset.id;
-                        const start = parseFloat(card.querySelector('.diag-start').value) || 0.0;
-                        const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
-                        const sfxName = card.querySelector('.form-row input[type="text"]').value;
-
-                        const audioFileInput = card.querySelector('.item-audio-file');
-                        let audioUrl = "";
-                        if (audioFileInput && audioFileInput.files && audioFileInput.files[0]) {
-                            audioUrl = audioFileInput.files[0].name;
-                        } else if (card.audioUrl && !card.audioUrl.startsWith('blob:')) {
-                            audioUrl = card.audioUrl;
-                        } else {
-                            audioUrl = card.audioName || "";
-                        }
-
-                        items.push({
-                            id,
+                            charName: item.charName || "캐릭터",
+                            charColor: item.charColor || "#ffffff",
+                            text: item.text || "",
+                            audioUrl: item.audioUrl || "",
+                            start: parseFloat(item.start) || 0.0,
+                            duration: parseFloat(item.duration) || 2.0,
+                            x: parseFloat(item.x) || 10.0,
+                            y: parseFloat(item.y) || 20.0,
+                            baseAngle: parseFloat(item.baseAngle) || 45,
+                            tipDx: parseFloat(item.tipDx) || 30,
+                            tipDy: parseFloat(item.tipDy) || 30,
+                            baseWidth: parseFloat(item.baseWidth) || 14
+                        };
+                    } else if (item.type === 'sfx') {
+                        return {
+                            id: item.id,
                             type: 'sfx',
-                            name: sfxName,
-                            audioUrl,
-                            start,
-                            duration
-                        });
-                    });
-                }
+                            name: item.name || "효과음 명칭",
+                            audioUrl: item.audioUrl || "",
+                            start: parseFloat(item.start) || 0.0,
+                            duration: parseFloat(item.duration) || 2.0
+                        };
+                    }
+                    return item;
+                });
 
                 return {
                     id: cut.id,
@@ -2507,7 +2552,7 @@
                     bgImage: cut.layer3 ? cut.layer3.name : null,
                     bgImageName: cut.layer3 ? cut.layer3.name : null,
                     effectType: cut.effectType || 'none',
-                    items: items
+                    items: cleanItems
                 };
             });
 

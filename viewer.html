@@ -489,6 +489,7 @@
         var cutsData = window.cutsData = window.cutsData || [];
         var activeBgms = window.activeBgms = window.activeBgms || {}; 
         var isWebAudioInitialized = window.isWebAudioInitialized = window.isWebAudioInitialized || false;
+        var isAutoplayPending = window.isAutoplayPending = window.isAutoplayPending !== undefined ? window.isAutoplayPending : true;
 
         var viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
         var introOverlay = window.introOverlay = document.getElementById('introOverlay');
@@ -820,8 +821,18 @@
         // 뷰어 전용 selectCut 함수 정의
         function selectCut(cutId, smoothScroll = true) {
             try {
+                // cutId가 0(숫자)이면 첫 번째 컷의 ID로 대체 (강제 렌더링 동기화)
+                if (cutId === 0 && cutsData && cutsData.length > 0) {
+                    cutId = cutsData[0].id;
+                }
                 const targetItem = document.getElementById(`viewerCut_${cutId}`);
                 if (targetItem) {
+                    // 컷 변경 시마다 requestAnimationFrame을 사용하여 강제 Reflow 유도
+                    requestAnimationFrame(() => {
+                        void targetItem.offsetHeight;
+                        void viewerScrollContainer.offsetHeight;
+                    });
+
                     if (smoothScroll && typeof animateScrollTo === 'function') {
                         animateScrollTo(targetItem.offsetTop, 600, () => {
                             window.lastSettledCutId = cutId;
@@ -838,6 +849,13 @@
                             window.handleScrollUpdate();
                         }
                     }
+                }
+                
+                // Canvas 강제 갱신용 updateCanvas 호출 (폴백 가드 적용)
+                if (typeof window.updateCanvas === 'function') {
+                    window.updateCanvas();
+                } else if (typeof updateCanvas === 'function') {
+                    updateCanvas();
                 }
             } catch (err) {
                 console.error("[Viewer selectCut Error]", err);
@@ -908,10 +926,7 @@
                 if (cutsData.length > 0) {
                     setTimeout(() => {
                         window.lastSettledCutId = null; // lastSettledCutId를 명시적으로 비워서 안착 판단 유도
-                        selectCut(cutsData[0].id, false);
-                        if (typeof window.triggerAutoplayForCurrentCut === 'function') {
-                            window.triggerAutoplayForCurrentCut();
-                        }
+                        selectCut(0, false);
                     }, 50);
                 }
                 
@@ -926,10 +941,7 @@
                 if (cutsData.length > 0) {
                     setTimeout(() => {
                         window.lastSettledCutId = null;
-                        selectCut(cutsData[0].id, false);
-                        if (typeof window.triggerAutoplayForCurrentCut === 'function') {
-                            window.triggerAutoplayForCurrentCut();
-                        }
+                        selectCut(0, false);
                     }, 50);
                 }
             }
@@ -940,107 +952,23 @@
             await initViewerFromData('data.json');
         });
 
-        // viewer DOM 동적 빌더
+        // viewer DOM 동적 빌더 (플레이스홀더만 생성하여 Lazy Rendering 보장)
         function buildViewerDOM(data) {
             viewerScrollContainer.innerHTML = '';
             
-            data.cuts.forEach(c => {
+            data.cuts.forEach((c, idx) => {
                 const cutItem = document.createElement('div');
                 cutItem.className = 'viewer-cut-item';
                 cutItem.id = `viewerCut_${c.id}`;
                 cutItem.dataset.cutId = c.id;
-
-                // [신규] 3중 레이어 렌더링 연산부 (구버전 bgImage 동시 호환)
-                function buildLayer(layerIndex, layerObj) {
-                    if (!layerObj || !layerObj.url) return null;
-
-                    let el;
-                    if (layerObj.type === 'video') {
-                        el = document.createElement('video');
-                        el.src = normalizeMediaPath(layerObj.url);
-                        el.autoplay = true;
-                        el.loop = true;
-                        el.muted = true;
-                        el.playsinline = true;
-                        el.setAttribute('autoplay', '');
-                        el.setAttribute('loop', '');
-                        el.setAttribute('muted', '');
-                        el.setAttribute('playsinline', '');
-                    } else {
-                        el = document.createElement('div');
-                        el.style.backgroundImage = `url(${normalizeMediaPath(layerObj.url)})`;
-                    }
-
-                    el.className = 'cut-layer';
-                    el.dataset.layer = layerIndex;
-
-                    // Stacking order: layer 3(background - z-index: 1), layer 2(prop - z-index: 2), layer 1(char - z-index: 3)
-                    if (layerIndex === 3) el.style.zIndex = '1';
-                    else if (layerIndex === 2) el.style.zIndex = '2';
-                    else if (layerIndex === 1) el.style.zIndex = '3';
-
-                    // 연출 효과 타입 적용
-                    if (c.effectType && c.effectType !== 'none' && c.effectType !== 'shake') {
-                        el.classList.add(`effect-${c.effectType}`);
-                    }
-
-                    return el;
-                }
-
-                const l3 = buildLayer(3, c.layer3 || (c.bgImage ? { url: c.bgImage, name: c.bgImageName || '배경', type: 'image' } : null));
-                const l2 = buildLayer(2, c.layer2);
-                const l1 = buildLayer(1, c.layer1);
-
-                if (l3) cutItem.appendChild(l3);
-                if (l2) cutItem.appendChild(l2);
-                if (l1) cutItem.appendChild(l1);
-
-                if (c.effectType === 'shake') {
-                    cutItem.classList.add('effect-shake');
+                if (idx === 0) {
+                    cutItem.style.opacity = '0'; // 첫 컷 로딩 전까지 화면 숨김
                 }
 
                 // 말풍선 담을 버블 컨테이너
                 const bubbleContainer = document.createElement('div');
                 bubbleContainer.className = 'bubble-container';
                 bubbleContainer.id = `bubbleContainer_${c.id}`;
-                
-                // 씬 아이템들 순회하여 dialogue 말풍선 렌더링
-                if (c.items) {
-                    c.items.forEach(item => {
-                        if (item.type === 'dialogue') {
-                            const bubble = document.createElement('div');
-                            bubble.className = 'speech-bubble show';
-                            bubble.id = `bubble_${item.id}`;
-                            bubble.dataset.cardId = item.id;
-                            
-                            // 실시간 말꼬리 렌더링에 필요한 물리 속성들을 데이터셋으로 바인딩
-                            bubble.dataset.baseAngle = item.baseAngle || 45;
-                            bubble.dataset.tipDx = item.tipDx || 30;
-                            bubble.dataset.tipDy = item.tipDy || 30;
-                            bubble.dataset.baseWidth = item.baseWidth || 14;
-
-                            bubble.style.left = `${item.x}%`;
-                            bubble.style.top = `${item.y}%`;
-                            bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
-                            bubble.style.setProperty('--text-color', getContrastYIQ(item.charColor));
-
-                            bubble.innerHTML = `
-                                <div class="bubble-shadow-layer"></div>
-                                <div class="bubble-bg-cover"></div>
-                                <svg class="tail-svg" viewBox="0 0 1000 1000" width="1000" height="1000" style="opacity: 1;">
-                                    <path class="bubble-path bubble-path-fill" d="" style="fill: var(--bubble-color); stroke: none; opacity: 1;" />
-                                    <path class="bubble-path bubble-path-stroke" d="" style="fill: none; stroke: #111827; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; opacity: 1;" />
-                                </svg>
-                                <div class="bubble-text-layer">${item.text}</div>
-                            `;
-                            
-                            // 실시간 말풍선 크기 변화 감지하여 말꼬리 재계산 처리
-                            resizeObserver.observe(bubble);
-                            
-                            bubbleContainer.appendChild(bubble);
-                        }
-                    });
-                }
                 
                 cutItem.appendChild(bubbleContainer);
                 viewerScrollContainer.appendChild(cutItem);
@@ -1204,7 +1132,9 @@
 
                 if (!activeBgms[cardId]) {
                     const audio = new Audio(normalizeMediaPath(b.audioUrl));
+                    audio.autoplay = false;
                     audio.loop = true;
+                    audio.load();
                     
                     // 루프백 명시적 Fail-safe 복귀
                     audio.addEventListener('ended', () => {
@@ -1421,6 +1351,7 @@
         function startCinematicViewer() {
             if (isWebAudioInitialized) return;
             isWebAudioInitialized = true;
+            window.isAutoplayPending = false;
 
             // 1. Web Audio API 초기화 강제 트리거
             if (window.audioPipeManager) {

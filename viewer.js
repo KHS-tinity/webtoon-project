@@ -729,7 +729,7 @@ function renderDialogueTyping(item, elapsed, mySessionId) {
     const bubble = item.bubbleDOM;
     if (!bubble) return;
 
-    // [스레드 격리 검증] 이전 타이핑 세션이 존재하고 현재 세션과 일치하지 않으면 즉각 파괴 (이전 컷/수정 스레드 완벽 차단)
+    // [스레드 격리 검증] 이전 타이핑 세션이 존재하고 현재 세션과 일치하지 않으면 즉각 파괴
     if (bubble.dataset.typingSessionId && mySessionId.toString() !== bubble.dataset.typingSessionId) {
         return;
     }
@@ -744,71 +744,50 @@ function renderDialogueTyping(item, elapsed, mySessionId) {
     const textLayer = item.textLayerDOM;
     const tailSvg = item.tailSvgDOM;
     const paths = item.pathsDOM;
-    const wrapper = item.wrapperDOM;
     const spans = item.spansDOM;
     
+    // [1] 대기 상태 (elapsed < 0)
     if (elapsed < 0) {
         item.isTypingStarted = false;
-        item.isTypingScheduled = false;
-        item.typingRenderAllowed = false;
         item.isTypingInProgress = false; // 타이핑 진행 중 플래그 리셋
         bubble.removeAttribute('data-typing-in-progress');
         
         // 컷 이동 완료 시 READY 강제 전환 및 텍스트 레이어 초기화
         bubble.setAttribute('data-typing-state', 'READY');
         
-        if (bubble.classList.contains('show') || bubble.style.opacity !== '0') {
-            bubble.style.transition = 'none';
-            if (tailSvg) tailSvg.style.transition = 'none';
-            if (paths.length > 0) {
-                paths.forEach(p => p.style.transition = 'none');
-            }
-            
+        // 인라인 스타일 투명도 해제하여 CSS 클래스(.animate) 본연의 상태로 복귀 유도
+        bubble.style.opacity = '';
+        if (tailSvg) tailSvg.style.opacity = '';
+        paths.forEach(p => p.style.opacity = '');
+
+        if (bubble.classList.contains('show')) {
             bubble.classList.remove('show');
-            bubble.style.opacity = '0';
-            if (tailSvg) tailSvg.style.opacity = '0';
-            if (paths.length > 0) {
-                paths.forEach(p => p.style.opacity = '0');
-            }
-            
-            void bubble.offsetWidth;
-            
-            bubble.style.transition = '';
-            if (tailSvg) tailSvg.style.transition = '';
-            if (paths.length > 0) {
-                paths.forEach(p => p.style.transition = '');
-            }
-            
+        }
+        if (!bubble.classList.contains('animate')) {
             bubble.classList.add('animate');
         }
+
         if (textLayer) {
             textLayer.style.opacity = '0';
-            textLayer.style.visibility = 'hidden'; // [Visibility Lock] 대기 상태 숨김
+            textLayer.style.visibility = 'hidden'; // 대기 상태 숨김
         }
+        spans.forEach(s => {
+            s.style.display = 'none';
+            s.style.opacity = '0';
+        });
         return;
     }
 
-    // [Failsafe & 퇴장 타이밍 구현] 설정된 대사 지속 시간(duration)이 경과했을 때 아주 매끄럽게 fade out 및 scale down 연출 수행
+    // [2] 퇴장 상태 (elapsed >= item.duration)
     if (elapsed >= item.duration) {
         item.isTypingInProgress = false;
         bubble.removeAttribute('data-typing-in-progress');
+        bubble.setAttribute('data-typing-state', 'COMPLETE'); // 퇴장 상태 완료로 락 가드
         
         if (bubble.classList.contains('show')) {
-            bubble.style.transition = ''; // 기본 CSS transition 가동
-            if (tailSvg) tailSvg.style.transition = '';
-            if (paths.length > 0) {
-                paths.forEach(p => p.style.transition = '');
-            }
-            
-            // show를 떼고 animate를 추가하여 부드러운 스케일다운 및 투명도 0으로 복귀 (transition 활용)
+            // show를 떼고 animate를 추가하여 부드러운 스케일다운 및 투명도 0으로 복귀 (CSS transition 활용)
             bubble.classList.remove('show');
             bubble.classList.add('animate');
-            
-            bubble.style.opacity = '0';
-            if (tailSvg) tailSvg.style.opacity = '0';
-            if (paths.length > 0) {
-                paths.forEach(p => p.style.opacity = '0');
-            }
         }
         
         if (textLayer) {
@@ -820,111 +799,54 @@ function renderDialogueTyping(item, elapsed, mySessionId) {
             s.style.display = 'none';
             s.style.opacity = '0';
         });
-        
-        bubble.setAttribute('data-typing-state', 'COMPLETE'); // 퇴장 상태 완료로 락 가드
         return;
     }
 
-    if (!item.isTypingStarted) {
+    // [3] 등장 및 타이핑 진행 상태 (0 <= elapsed < item.duration)
+    const currentState = bubble.getAttribute('data-typing-state') || 'READY';
+
+    // 처음 켜지는 순간 (READY -> TYPING 전환)
+    if (currentState === 'READY') {
+        bubble.setAttribute('data-typing-state', 'TYPING');
+        bubble.setAttribute('data-typing-in-progress', 'true');
+        item.isTypingInProgress = true;
         item.isTypingStarted = true;
-        item.typingRenderAllowed = false;
-        bubble.setAttribute('data-typing-state', 'READY');
-        bubble.removeAttribute('data-typing-in-progress');
+
+        // 인라인 투명도를 해제하여 CSS Transition이 100% 미려하게 동작하도록 함
+        bubble.style.opacity = '';
+        if (tailSvg) tailSvg.style.opacity = '';
+        paths.forEach(p => p.style.opacity = '');
+
+        // .animate 클래스를 떼고 .show 클래스를 입혀 scale-up(cubic-bezier) 및 fade-in 시작!
+        bubble.classList.remove('animate');
+        bubble.classList.add('show');
+
+        // 타이핑 전용 상태 무결성 청소
         forceClearTypingState(bubble);
     }
 
-    // [등장 연출 고도화] 말풍선 등장 첫 프레임에 .animate (scale 0.6, opacity 0) 상태가 렌더 큐에 먼저 박히도록 스케줄링
-    if (!bubble.classList.contains('show') || bubble.style.opacity === '0') {
-        // 프리미엄 트랜지션 적용을 위한 강제 준비 상태 주입
-        bubble.classList.remove('show');
-        bubble.classList.add('animate');
-        bubble.style.opacity = '0';
-        if (tailSvg) tailSvg.style.opacity = '0';
-        if (paths.length > 0) {
-            paths.forEach(p => p.style.opacity = '0');
-        }
-        
-        // 타이핑 영역도 즉시 가려두기
-        forceClearTypingState(bubble);
-        
-        // 브라우저가 .animate 상태를 스크린에 페인트/인지할 시간을 1프레임 줌
-        requestAnimationFrame(() => {
-            // 이제 show 클래스를 추가하고 transition 속성을 활성화하여 부드러운 스케일업/페이드인을 엔진 단에서 실행함
-            bubble.style.transition = '';
-            bubble.style.opacity = '';
-            if (tailSvg) {
-                tailSvg.style.transition = '';
-                tailSvg.style.opacity = '';
-            }
-            if (paths.length > 0) {
-                paths.forEach(p => {
-                    p.style.transition = '';
-                    p.style.opacity = '';
-                });
-            }
-            bubble.classList.remove('animate');
-            bubble.classList.add('show');
-        });
-        
-        // 말풍선이 반쯤 올라오기 시작할 무렵(150ms 딜레이 후) 타이핑 애니메이션이 흐르도록 자연스러운 무드 격리 스케줄링
-        if (!item.isTypingScheduled) {
-            item.isTypingScheduled = true;
-            item.typingRenderAllowed = false;
-            
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    if (mySessionId === activeSessionId || (bubble.dataset.typingSessionId && mySessionId.toString() === bubble.dataset.typingSessionId)) {
-                        item.typingRenderAllowed = true;
-                    }
-                });
-            }, 150); // 150ms 딜레이로 말풍선 스케일업 도중에 텍스트가 자연스럽게 타이핑되기 시작
-        }
-    }
+    // 오직 elapsed 경과 시간만을 기준으로 글자 노출을 동기적으로 판정 (비동기 타이머 완전히 제거!)
+    const delaySec = 0.15; // 말풍선 스케일업이 진행되는 150ms 시점 이후부터 타이핑 개시
 
-    // TYPING 상태 진입 및 디스플레이 블록 강제 전환 기동
-    if (item.typingRenderAllowed) {
-        // [Visibility Lock 해제] 실제 첫 글자 타이핑 렌더링이 시작되는 시점에만 가시화 오픈!
+    if (elapsed >= delaySec && currentState !== 'COMPLETE') {
+        // [Visibility Lock 해제] 실제 첫 글자 타이핑 렌더링이 시작되는 시점에 가시화 오픈!
         if (textLayer) {
             textLayer.style.visibility = 'visible';
             textLayer.style.opacity = '1';
         }
 
-        // [락킹 체계] 이미 완료(COMPLETE)된 자막은 시점이 갑자기 변경되더라도 강제로 흔들리지 않게 락 가드
-        const currentState = bubble.getAttribute('data-typing-state') || 'READY';
-        
-        if (currentState === 'COMPLETE') {
-            if (textLayer) {
-                textLayer.style.visibility = 'visible';
-                textLayer.style.opacity = '1';
-            }
-            spans.forEach(s => {
-                s.style.display = 'inline-block';
-                s.style.opacity = '1';
-            });
-            return;
-        }
-
-        // 타이핑 진행 중 플래그 활성화
-        if (currentState === 'READY') {
-            bubble.setAttribute('data-typing-state', 'TYPING');
-            bubble.setAttribute('data-typing-in-progress', 'true');
-            item.isTypingInProgress = true;
+        if (spans.length > 0) {
+            // [통통 튀는 타이핑 복원] 대사 길이에 무관하게 일정하고 경쾌하게 타이핑되는 35ms 고정 속도 적용
+            const typingSpeedSec = 0.035; // 35ms당 1글자
+            const typingElapsed = elapsed - delaySec;
+            const spansToShow = Math.min(spans.length, Math.floor(typingElapsed / typingSpeedSec));
             
-            // Reflow 계산 강제 동기화 (부모 래퍼)
+            // 리플로우 방지를 위해 부모 typing-wrapper 1회만 Reflow 최적화
             const wrapper = bubble.querySelector('.typing-wrapper');
             if (wrapper) {
                 wrapper.getBoundingClientRect();
             }
-        }
 
-        if (textLayer) textLayer.style.opacity = '1';
-
-        if (spans.length > 0) {
-            // [3. 타임스탬프 비례식 동기화] 고정 35ms 대신 대사 총 재생 시간 대비 경과 시간 비율로 계산
-            // 글자당 배정 시간 = item.duration / spans.length
-            const charDuration = Math.max(0.001, item.duration) / spans.length;
-            const spansToShow = Math.min(spans.length, Math.floor(elapsed / charDuration));
-            
             for (let i = 0; i < spans.length; i++) {
                 if (i < spansToShow) {
                     spans[i].style.display = 'inline-block'; // display: inline-block 활성화
@@ -941,8 +863,18 @@ function renderDialogueTyping(item, elapsed, mySessionId) {
                 item.isTypingInProgress = false; // 타이핑 완료 상태 플래그 해제
             }
         }
+    } else if (currentState === 'COMPLETE') {
+        // 이미 완료된 자막은 위치 복구 등을 위해 보장 노출
+        if (textLayer) {
+            textLayer.style.visibility = 'visible';
+            textLayer.style.opacity = '1';
+        }
+        spans.forEach(s => {
+            s.style.display = 'inline-block';
+            s.style.opacity = '1';
+        });
     } else {
-        // 타이핑 준비 단계(지연 시간 대기 중)
+        // 타이핑 준비 단계(지연 시간 150ms 대기 중)
         if (textLayer) textLayer.style.opacity = '0';
         spans.forEach(s => {
             s.style.display = 'none';

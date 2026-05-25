@@ -1,33 +1,85 @@
 // =========================================================================
-// 🎬 웹툰 시네마틱 뷰어 공통 연출 및 사운드 핵심 엔진 모듈 (viewer.js)
+// ?렗 ?뱁댆 ?쒕꽕留덊떛 酉곗뼱 怨듯넻 ?곗텧 諛??ъ슫???듭떖 ?붿쭊 紐⑤뱢 (viewer.js)
 // =========================================================================
 
-// 전역 상태 캐시 및 재생 엔진 변수 정의 (이중 선언 방지 및 전역 스코프 참조 ReferenceError 완전 차단)
-// var 선언을 통해 스크립트 전역 범위에 변수를 정의하여 window. 없이 호출해도 참조가 터지지 않게 보호하며,
-// 이미 window 객체에 할당되어 있을 경우 그 참조를 가져오고 그렇지 않으면 초깃값으로 세팅합니다.
-var cuts = window.cuts = window.cuts || [];
-var currentCutId = window.currentCutId = window.currentCutId || null;
-var isSyncScrolling = window.isSyncScrolling = window.isSyncScrolling || false;
-var programmaticScrollAnimId = window.programmaticScrollAnimId = window.programmaticScrollAnimId || null;
-var isTimeBasedAutoplay = window.isTimeBasedAutoplay = window.isTimeBasedAutoplay || false;
-var lastSettledCutId = window.lastSettledCutId = window.lastSettledCutId || null;
-var lastFrameTime = window.lastFrameTime = window.lastFrameTime || 0;
-var isProgrammaticPlaying = window.isProgrammaticPlaying = window.isProgrammaticPlaying || false;
-var accumulatedTime = window.accumulatedTime = window.accumulatedTime || 0.0;
+// 1. ?꾩뿭 蹂??李몄“ ?덉쟾 ?μ튂 (Global Variable Safeguard)
+window.cuts = window.cuts || [];
+window.currentCutId = window.currentCutId || null;
+window.isSyncScrolling = window.isSyncScrolling || false;
+window.programmaticScrollAnimId = window.programmaticScrollAnimId || null;
+window.isTimeBasedAutoplay = window.isTimeBasedAutoplay || false;
+window.lastSettledCutId = window.lastSettledCutId || null;
+window.lastFrameTime = window.lastFrameTime || 0;
+window.isProgrammaticPlaying = window.isProgrammaticPlaying || false;
+window.accumulatedTime = window.accumulatedTime || 0.0;
+window.isFirstCutReady = window.isFirstCutReady || false;
+window.isFastForwarding = window.isFastForwarding || false;
+window.speedMultiplier = window.speedMultiplier || 1.0;
+window.playItemsQueue = window.playItemsQueue || [];
+window.playingAudios = window.playingAudios || [];
+window.playAnimationId = window.playAnimationId || null;
+window.activeSessionId = window.activeSessionId || null;
+window.isPlayMode = window.isPlayMode || false;
+window.maxCutDuration = window.maxCutDuration || 10.0;
+window.isScrollDirectionDown = window.isScrollDirectionDown || true;
+window.viewerScrollContainer = window.viewerScrollContainer || null;
+window.isBgmVolumeMuted = window.isBgmVolumeMuted || false;
+window.isAutoplayPending = window.isAutoplayPending || false;
 
-// 빨리감기 및 재생 가속 배율 관련 변수들
-var isFastForwarding = window.isFastForwarding = window.isFastForwarding || false;
-var speedMultiplier = window.speedMultiplier = window.speedMultiplier || 1.0;
-var playItemsQueue = window.playItemsQueue = window.playItemsQueue || [];
-var playingAudios = window.playingAudios = window.playingAudios || [];
-var playAnimationId = window.playAnimationId = window.playAnimationId || null;
-var activeSessionId = window.activeSessionId = window.activeSessionId || null;
-var isPlayMode = window.isPlayMode = window.isPlayMode || false;
-var maxCutDuration = window.maxCutDuration = window.maxCutDuration || 10.0;
-var isScrollDirectionDown = window.isScrollDirectionDown = window.isScrollDirectionDown || true;
-var viewerScrollContainer = window.viewerScrollContainer = window.viewerScrollContainer || null;
+// 2. ?ㅽ겕由쏀듃 ?꾩뿭 ?ㅼ퐫??蹂???뺤쓽
+var cuts;
+var currentCutId;
+var isSyncScrolling;
+var programmaticScrollAnimId;
+var isTimeBasedAutoplay;
+var lastSettledCutId;
+var lastFrameTime;
+var isProgrammaticPlaying;
+var accumulatedTime;
+var isFirstCutReady;
+var isFastForwarding;
+var speedMultiplier;
+var playItemsQueue;
+var playingAudios;
+var playAnimationId;
+var activeSessionId;
+var isPlayMode;
+var maxCutDuration;
+var isScrollDirectionDown;
+var viewerScrollContainer;
+var isBgmVolumeMuted;
+var isAutoplayPending;
+var audioPipeManager;
 
-// 미디어 경로 정규화 (Path Normalization) 유틸리티 함수
+// 3. 濡쒕뱶 ?쒖꽌 臾댁떆 ?섑띁 (Load Event Wrapper)
+window.addEventListener('DOMContentLoaded', () => {
+    cuts = window.cuts = window.cuts || [];
+    currentCutId = window.currentCutId = window.currentCutId || null;
+    isSyncScrolling = window.isSyncScrolling = window.isSyncScrolling || false;
+    programmaticScrollAnimId = window.programmaticScrollAnimId = window.programmaticScrollAnimId || null;
+    isTimeBasedAutoplay = window.isTimeBasedAutoplay = window.isTimeBasedAutoplay || false;
+    lastSettledCutId = window.lastSettledCutId = window.lastSettledCutId || null;
+    lastFrameTime = window.lastFrameTime = window.lastFrameTime || 0;
+    isProgrammaticPlaying = window.isProgrammaticPlaying = window.isProgrammaticPlaying || false;
+    accumulatedTime = window.accumulatedTime = window.accumulatedTime || 0.0;
+    isFirstCutReady = window.isFirstCutReady = window.isFirstCutReady || false;
+
+    isFastForwarding = window.isFastForwarding = window.isFastForwarding || false;
+    speedMultiplier = window.speedMultiplier = window.speedMultiplier || 1.0;
+    playItemsQueue = window.playItemsQueue = window.playItemsQueue || [];
+    playingAudios = window.playingAudios = window.playingAudios || [];
+    playAnimationId = window.playAnimationId = window.playAnimationId || null;
+    activeSessionId = window.activeSessionId = window.activeSessionId || null;
+    isPlayMode = window.isPlayMode = window.isPlayMode || false;
+    maxCutDuration = window.maxCutDuration = window.maxCutDuration || 10.0;
+    isScrollDirectionDown = window.isScrollDirectionDown = window.isScrollDirectionDown || true;
+    viewerScrollContainer = window.viewerScrollContainer = window.viewerScrollContainer || null;
+    isBgmVolumeMuted = window.isBgmVolumeMuted = window.isBgmVolumeMuted || false;
+    isAutoplayPending = window.isAutoplayPending = window.isAutoplayPending || false;
+
+    audioPipeManager = window.audioPipeManager = window.audioPipeManager || new WebAudioPipeManager();
+});
+
 function normalizeMediaPath(url) {
     if (!url) return "";
     if (url.startsWith('blob:') || url.startsWith('http:') || url.startsWith('https:') || url.startsWith('/') || url.includes('/') || url.includes('\\')) {
@@ -36,8 +88,7 @@ function normalizeMediaPath(url) {
     return '자료/' + url;
 }
 window.normalizeMediaPath = normalizeMediaPath; // 전역 스코프 바인딩
-
-// ================= Web Audio API 자동 음압 정규화(Auto-Normalization) 시스템 =================
+// ================= Web Audio API ?먮룞 ?뚯븬 ?뺢퇋??Auto-Normalization) ?쒖뒪??=================
 class WebAudioPipeManager {
     constructor() {
         this.ctx = null;
@@ -54,14 +105,14 @@ class WebAudioPipeManager {
         if (this.ctx) return;
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         
-        // 1. 보이스 및 SFX 마스터 채널 셋업
+        // 1. 蹂댁씠??諛?SFX 留덉뒪??梨꾨꼸 ?뗭뾽
         this.voiceMasterGain = this.ctx.createGain();
         this.voiceMasterAnalyser = this.ctx.createAnalyser();
         this.voiceMasterAnalyser.fftSize = 512;
         this.voiceMasterGain.connect(this.voiceMasterAnalyser);
         this.voiceMasterAnalyser.connect(this.ctx.destination);
         
-        // 2. BGM 마스터 채널 셋업
+        // 2. BGM 留덉뒪??梨꾨꼸 ?뗭뾽
         this.bgmMasterGain = this.ctx.createGain();
         this.bgmMasterAnalyser = this.ctx.createAnalyser();
         this.bgmMasterAnalyser.fftSize = 512;
@@ -70,10 +121,10 @@ class WebAudioPipeManager {
     }
 
     connectAudio(audioElement, type = 'voice') {
-        // [CORS 보안 예외 차단 가드] 로컬 file:/// 프로토콜 환경에서는 브라우저의 강력한 CORS 제약으로 
-        // MediaElementAudioSourceNode 생성 시 무조건 SecurityError가 유발되므로, 단순 바이패스 처리합니다.
+        // [CORS 蹂댁븞 ?덉쇅 李⑤떒 媛?? 濡쒖뺄 file:/// ?꾨줈?좎퐳 ?섍꼍?먯꽌??釉뚮씪?곗???媛뺣젰??CORS ?쒖빟?쇰줈 
+        // MediaElementAudioSourceNode ?앹꽦 ??臾댁“嫄?SecurityError媛 ?좊컻?섎?濡? ?⑥닚 諛붿씠?⑥뒪 泥섎━?⑸땲??
         if (window.location.protocol === 'file:') {
-            console.log("CORS 제한 모드 감지: Web Audio API 마스터 믹서 연결을 바이패스합니다.");
+            console.log("CORS ?쒗븳 紐⑤뱶 媛먯?: Web Audio API 留덉뒪??誘뱀꽌 ?곌껐??諛붿씠?⑥뒪?⑸땲??");
             return null;
         }
 
@@ -95,7 +146,7 @@ class WebAudioPipeManager {
             source.connect(gainNode);
             gainNode.connect(analyserNode);
 
-            // 해당 카테고리 마스터 믹서에 병합 연결
+            // ?대떦 移댄뀒怨좊━ 留덉뒪??誘뱀꽌??蹂묓빀 ?곌껐
             const targetMaster = (type === 'bgm') ? this.bgmMasterGain : this.voiceMasterGain;
             analyserNode.connect(targetMaster);
 
@@ -105,14 +156,14 @@ class WebAudioPipeManager {
 
             return nodePair;
         } catch (e) {
-            console.error("Web Audio API 연결 실패:", e);
+            console.error("Web Audio API ?곌껐 ?ㅽ뙣:", e);
             return null;
         }
     }
 }
-var audioPipeManager = window.audioPipeManager = window.audioPipeManager || new WebAudioPipeManager();
 
-// 실시간 RMS 분석 및 오토 게인 피드백 루프
+
+// ?ㅼ떆媛?RMS 遺꾩꽍 諛??ㅽ넗 寃뚯씤 ?쇰뱶諛?猷⑦봽
 function runRealtimeNormalization() {
     if (!audioPipeManager.ctx) return;
     
@@ -149,53 +200,53 @@ function runRealtimeNormalization() {
             db = 20 * Math.log10(rms);
         }
         
-        // 보이스 타겟 -14dB, BGM 타겟 -26dB
+        // 蹂댁씠???寃?-14dB, BGM ?寃?-26dB
         const targetDb = (type === 'bgm') ? -26.0 : -14.0;
         let targetGain = 1.0;
         
         if (db < -45.0) {
-            // 노이즈 게이트 작동: 무음/잡음 플로어 구간에서는 게인을 1.0으로 강제 환원하여 노이즈 펌핑 방지
+            // ?몄씠利?寃뚯씠???묐룞: 臾댁쓬/?≪쓬 ?뚮줈??援ш컙?먯꽌??寃뚯씤??1.0?쇰줈 媛뺤젣 ?섏썝?섏뿬 ?몄씠利??뚰븨 諛⑹?
             targetGain = 1.0;
         } else {
             const diffDb = targetDb - db;
             
             if (type === 'voice') {
                 if (diffDb > 0) {
-                    // 대사가 낮은 경우에만 자동 증폭
+                    // ??ш? ??? 寃쎌슦?먮쭔 ?먮룞 利앺룺
                     targetGain = Math.pow(10, diffDb / 20);
-                    targetGain = Math.min(4.0, targetGain); // 최대 4배 증폭 제한
+                    targetGain = Math.min(4.0, targetGain); // 理쒕? 4諛?利앺룺 ?쒗븳
                 } else {
                     targetGain = 1.0;
                 }
             } else if (type === 'bgm') {
                 if (diffDb < 0) {
-                    // BGM이 너무 높은 경우에만 자동 감쇄
+                    // BGM???덈Т ?믪? 寃쎌슦?먮쭔 ?먮룞 媛먯뇙
                     targetGain = Math.pow(10, diffDb / 20);
-                    targetGain = Math.max(0.05, targetGain); // 최소 0.05 감쇄 제한
+                    targetGain = Math.max(0.05, targetGain); // 理쒖냼 0.05 媛먯뇙 ?쒗븳
                 } else {
                     targetGain = 1.0;
                 }
             }
         }
         
-        // setTargetAtTime을 이용해 청각적 거부감 없이 100ms 지연 수렴
+        // setTargetAtTime???댁슜??泥?컖??嫄곕?媛??놁씠 100ms 吏???섎졃
         gainNode.gain.setTargetAtTime(targetGain, now, 0.1);
     });
 }
 
-// 보이스와 BGM의 우선순위 가중치 6dB 격차 실시간 크로스오버 조절
+// 蹂댁씠?ㅼ? BGM???곗꽑?쒖쐞 媛以묒튂 6dB 寃⑹감 ?ㅼ떆媛??щ줈?ㅼ삤踰?議곗젅
 function runPriorityCrossoverMonitoring() {
     if (!audioPipeManager.ctx || !audioPipeManager.voiceMasterAnalyser || !audioPipeManager.bgmMasterAnalyser) return;
     
     const now = audioPipeManager.ctx.currentTime;
     
-    // 만약 배경음악이 음소거 상태라면 게인을 0.0으로 강제 고정 후 바이패스
+    // 留뚯빟 諛곌꼍?뚯븙???뚯냼嫄??곹깭?쇰㈃ 寃뚯씤??0.0?쇰줈 媛뺤젣 怨좎젙 ??諛붿씠?⑥뒪
     if (window.isBgmVolumeMuted) {
         audioPipeManager.bgmMasterGain.gain.setTargetAtTime(0.0, now, 0.08);
         return;
     }
     
-    // 1. 보이스 마스터 RMS 계산
+    // 1. 蹂댁씠??留덉뒪??RMS 怨꾩궛
     const voiceBuffer = new Float32Array(audioPipeManager.voiceMasterAnalyser.fftSize);
     audioPipeManager.voiceMasterAnalyser.getFloatTimeDomainData(voiceBuffer);
     let voiceSum = 0;
@@ -204,7 +255,7 @@ function runPriorityCrossoverMonitoring() {
     let voiceDb = -100;
     if (voiceRms > 0.00001) voiceDb = 20 * Math.log10(voiceRms);
     
-    // 2. BGM 마스터 RMS 계산
+    // 2. BGM 留덉뒪??RMS 怨꾩궛
     const bgmBuffer = new Float32Array(audioPipeManager.bgmMasterAnalyser.fftSize);
     audioPipeManager.bgmMasterAnalyser.getFloatTimeDomainData(bgmBuffer);
     let bgmSum = 0;
@@ -213,23 +264,23 @@ function runPriorityCrossoverMonitoring() {
     let bgmDb = -100;
     if (bgmRms > 0.00001) bgmDb = 20 * Math.log10(bgmRms);
 
-    // 3. 보이스 재생 감지 및 BGM 상대 음압 6dB 이상 벌림 크로스오버 작동
+    // 3. 蹂댁씠???ъ깮 媛먯? 諛?BGM ?곷? ?뚯븬 6dB ?댁긽 踰뚮┝ ?щ줈?ㅼ삤踰??묐룞
     if (voiceDb > -40.0) {
-        // 보이스가 실제로 유의미하게 출력되는 구간!
+        // 蹂댁씠?ㅺ? ?ㅼ젣濡??좎쓽誘명븯寃?異쒕젰?섎뒗 援ш컙!
         const currentDiff = voiceDb - bgmDb;
         if (currentDiff < 6.0) {
-            // 격차가 6dB 미만이어서 대사가 묻힐 우려가 있을 때 BGM 마스터를 감쇄
-            const shortfallDb = 6.0 - currentDiff; // 채워야 할 데시벨 차이
+            // 寃⑹감媛 6dB 誘몃쭔?댁뼱????ш? 臾삵옄 ?곕젮媛 ?덉쓣 ??BGM 留덉뒪?곕? 媛먯뇙
+            const shortfallDb = 6.0 - currentDiff; // 梨꾩썙?????곗떆踰?李⑥씠
             const targetBgmMasterGain = Math.pow(10, -shortfallDb / 20);
             
-            // BGM 마스터 게인을 부드럽게 감쇄 (80ms 빠른 반응 수렴)
+            // BGM 留덉뒪??寃뚯씤??遺?쒕읇寃?媛먯뇙 (80ms 鍮좊Ⅸ 諛섏쓳 ?섎졃)
             audioPipeManager.bgmMasterGain.gain.setTargetAtTime(Math.min(1.0, Math.max(0.15, targetBgmMasterGain)), now, 0.08);
         } else {
-            // 이미 충분한 차이가 나는 경우 원래 볼륨으로 복원
+            // ?대? 異⑸텇??李⑥씠媛 ?섎뒗 寃쎌슦 ?먮옒 蹂쇰ⅷ?쇰줈 蹂듭썝
             audioPipeManager.bgmMasterGain.gain.setTargetAtTime(1.0, now, 0.1);
         }
     } else {
-        // 보이스 무음 구간: BGM 마스터를 원래 볼륨으로 부드럽게 복구
+        // 蹂댁씠??臾댁쓬 援ш컙: BGM 留덉뒪?곕? ?먮옒 蹂쇰ⅷ?쇰줈 遺?쒕읇寃?蹂듦뎄
         audioPipeManager.bgmMasterGain.gain.setTargetAtTime(1.0, now, 0.15);
     }
 }
@@ -247,7 +298,7 @@ function animateScrollTo(targetScrollTop, durationMs, callback) {
     const distance = targetScrollTop - startScrollTop;
     const startTime = performance.now();
     
-    isSyncScrolling = true; // 스크롤 정지 타이머 및 편집 복구 락킹
+    isSyncScrolling = true; // ?ㅽ겕濡??뺤? ??대㉧ 諛??몄쭛 蹂듦뎄 ?쏀궧
     isPlayMode = true;
     
     function step(now) {
@@ -271,7 +322,7 @@ function animateScrollTo(targetScrollTop, durationMs, callback) {
     programmaticScrollAnimId = requestAnimationFrame(step);
 }
 
-// 실시간 Scene Sandboxing (현재 컷이 아닌 다른 모든 컷의 요소 및 사운드 격리)
+// ?ㅼ떆媛?Scene Sandboxing (?꾩옱 而룹씠 ?꾨땶 ?ㅻⅨ 紐⑤뱺 而룹쓽 ?붿냼 諛??ъ슫??寃⑸━)
 function sandboxOtherCuts(activeCutId) {
     cuts.forEach(c => {
         if (c.id !== activeCutId) {
@@ -322,7 +373,7 @@ function sandboxOtherCuts(activeCutId) {
                 });
             }
             
-            // 비활성 컷들의 진행 중인 개별 오디오 강제 중단
+            // 鍮꾪솢??而룸뱾??吏꾪뻾 以묒씤 媛쒕퀎 ?ㅻ뵒??媛뺤젣 以묐떒
             const inactiveSceneList = document.getElementById(`sceneList_${c.id}`);
             if (inactiveSceneList) {
                 const allCards = [...inactiveSceneList.querySelectorAll('.dialogue-item'), ...inactiveSceneList.querySelectorAll('.sfx-item')];
@@ -333,7 +384,7 @@ function sandboxOtherCuts(activeCutId) {
                     }
                 });
             } else {
-                // 런타임 뷰어 모드일 때: playItemsQueue 에 등록되어 있던 다른 컷의 오디오들 정지
+                // ?고???酉곗뼱 紐⑤뱶???? playItemsQueue ???깅줉?섏뼱 ?덈뜕 ?ㅻⅨ 而룹쓽 ?ㅻ뵒?ㅻ뱾 ?뺤?
                 playItemsQueue.forEach(item => {
                     if (item.audioObj && !cuts.find(cx => cx.id === activeCutId).items?.some(ix => ix.audioUrl === item.audioUrl)) {
                         item.audioObj.pause();
@@ -345,7 +396,7 @@ function sandboxOtherCuts(activeCutId) {
     });
 }
 
-// 100% 스크롤 진행률 기반 타임라인 스크러빙 제어 코어 함수
+// 100% ?ㅽ겕濡?吏꾪뻾瑜?湲곕컲 ??꾨씪???ㅽ겕?щ튃 ?쒖뼱 肄붿뼱 ?⑥닔
 function handleScrollUpdate() {
     if (!viewerScrollContainer) {
         viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
@@ -390,7 +441,7 @@ function handleScrollUpdate() {
     if (bestCutId !== currentCutId) {
         currentCutId = bestCutId;
 
-        // [편집기 돔 싱크 가드]
+        // [?몄쭛湲????깊겕 媛??
         const tabBtn = document.querySelector(`.cut-tab[data-cut-id="${bestCutId}"]`);
         if (tabBtn) {
             document.querySelectorAll('.cut-tab').forEach(btn => btn.classList.remove('active'));
@@ -406,7 +457,7 @@ function handleScrollUpdate() {
         if (typeof syncCutActiveClasses === 'function') {
             syncCutActiveClasses(bestCutId);
         } else {
-            // viewer.html 전용 액티브 클래스 직접 싱크
+            // viewer.html ?꾩슜 ?≫떚釉??대옒??吏곸젒 ?깊겕
             cuts.forEach(c => {
                 const cutItem = document.getElementById(`viewerCut_${c.id}`);
                 if (cutItem) {
@@ -452,12 +503,12 @@ function handleScrollUpdate() {
         
         const cutImageName = document.getElementById('cutImageName');
         if (cutImageName) {
-            cutImageName.textContent = activeCut.bgImageName || '선택된 파일 없음';
+            cutImageName.textContent = activeCut.bgImageName || '?좏깮???뚯씪 ?놁쓬';
         }
 
         buildPlayItemsQueue(bestCutId);
 
-        // [성능 개선 1 - Lazy Rendering Swap 기동]
+        // [?깅뒫 媛쒖꽑 1 - Lazy Rendering Swap 湲곕룞]
         if (typeof swapActiveCutsDOM === 'function') {
             swapActiveCutsDOM(bestCutId);
         }
@@ -503,7 +554,7 @@ function handleScrollUpdate() {
     }
 }
 
-// GPU 가속 비주얼 연출 실시간 스크러빙 주입
+// GPU 媛??鍮꾩＜???곗텧 ?ㅼ떆媛??ㅽ겕?щ튃 二쇱엯
 function renderCutVisualEffects(cutId, progress, isScrolled) {
     const cutItem = document.getElementById(`viewerCut_${cutId}`);
     if (!cutItem) return;
@@ -570,13 +621,13 @@ function renderCutVisualEffects(cutId, progress, isScrolled) {
 }
 
 function syncCutBubblesState(cutId, state) {
-    // 편집기 카드 돔과 런타임 뷰어 돔 호환성 확보
+    // ?몄쭛湲?移대뱶 ?붽낵 ?고???酉곗뼱 ???명솚???뺣낫
     const cards = [];
     const activeSceneList = document.getElementById(`sceneList_${cutId}`);
     if (activeSceneList) {
         activeSceneList.querySelectorAll('.dialogue-item').forEach(c => cards.push({ bubbleDOM: c.bubbleDOM }));
     } else {
-        // 런타임 뷰어 모드: cuts 배열에서 dialogue 아이템들을 찾아 직접 bubble DOM 수집
+        // ?고???酉곗뼱 紐⑤뱶: cuts 諛곗뿴?먯꽌 dialogue ?꾩씠?쒕뱾??李얠븘 吏곸젒 bubble DOM ?섏쭛
         const cut = cuts.find(cx => cx.id === cutId);
         if (cut && cut.items) {
             cut.items.forEach(item => {
@@ -626,7 +677,7 @@ function syncCutBubblesState(cutId, state) {
                     bubble.classList.add('show');
                 }
                 
-                // [교정] 말풍선이 이미 노출 상태여도, 다른 연출에 의해 가려졌던 말꼬리 패스들과 자막 스팬들의 투명도는 강제로 원복시킵니다.
+                // [援먯젙] 留먰뭾?좎씠 ?대? ?몄텧 ?곹깭?щ룄, ?ㅻⅨ ?곗텧???섑빐 媛?ㅼ죱??留먭섕由??⑥뒪?ㅺ낵 ?먮쭑 ?ㅽ뙩?ㅼ쓽 ?щ챸?꾨뒗 媛뺤젣濡??먮났?쒗궢?덈떎.
                 if (tailSvg) tailSvg.style.opacity = '1';
                 if (paths.length > 0) {
                     paths.forEach(path => {
@@ -672,7 +723,7 @@ function syncCutBubblesState(cutId, state) {
     });
 }
 
-// 1단계 렌더링 프레임 함수 독립화 및 [성능 개선 4 - 타이핑 렌더링 캐싱] 적용
+// 1?④퀎 ?뚮뜑留??꾨젅???⑥닔 ?낅┰??諛?[?깅뒫 媛쒖꽑 4 - ??댄븨 ?뚮뜑留?罹먯떛] ?곸슜
 function renderItemsFrame() {
     if (!audioPipeManager.ctx) {
         audioPipeManager.init();
@@ -767,13 +818,13 @@ function renderItemsFrame() {
                     bubble.classList.add('show');
                 }
                 
-                // [성능 개선 4 - 타이핑 렌더링 캐싱 필터]
+                // [?깅뒫 媛쒖꽑 4 - ??댄븨 ?뚮뜑留?罹먯떛 ?꾪꽣]
                 const spans = bubble.querySelectorAll('.typing-wrapper span');
                 if (spans.length > 0) {
                     const progressPct = Math.min(1.0, elapsed / item.duration);
                     const spansToShow = Math.floor(spans.length * progressPct);
                     
-                    // 캐싱 적용: 이전 프레임과 동일한 개수라면 DOM 갱신 차단
+                    // 罹먯떛 ?곸슜: ?댁쟾 ?꾨젅?꾧낵 ?숈씪??媛쒖닔?쇰㈃ DOM 媛깆떊 李⑤떒
                     if (item.lastSpansToShow !== spansToShow) {
                         item.lastSpansToShow = spansToShow;
                         for (let i = 0; i < spans.length; i++) {
@@ -804,7 +855,7 @@ function renderItemsFrame() {
                 if (targetAudioTime < durationLimit) {
                     if (isScrollDirectionDown || isTimeBasedAutoplay) {
                         if (item.audioObj.paused) {
-                            item.audioObj.play().catch(e => console.log("오디오 play 지연:", e));
+                            item.audioObj.play().catch(e => console.log("?ㅻ뵒??play 吏??", e));
                         }
                         if (Math.abs(item.audioObj.currentTime - targetAudioTime) > 0.2) {
                             item.audioObj.currentTime = targetAudioTime;
@@ -821,7 +872,7 @@ function renderItemsFrame() {
         }
     });
     
-    // 현재 활성화된 컷 내의 이중 타임라인 플레이헤드 갱신 (편집기 모드에서만 실행)
+    // ?꾩옱 ?쒖꽦?붾맂 而??댁쓽 ?댁쨷 ??꾨씪???뚮젅?댄뿤??媛깆떊 (?몄쭛湲?紐⑤뱶?먯꽌留??ㅽ뻾)
     const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
     if (activeSceneList) {
         activeSceneList.querySelectorAll('.timeline-container').forEach(container => {
@@ -837,7 +888,7 @@ function renderItemsFrame() {
 }
 window.renderItemsFrame = renderItemsFrame;
 
-// 60fps 마스터 프레임 스케줄러 (재생 상태일 때만 무한 루프 가동)
+// 60fps 留덉뒪???꾨젅???ㅼ?以꾨윭 (?ъ깮 ?곹깭???뚮쭔 臾댄븳 猷⑦봽 媛??
 function updateRealtimeTimeline(mySessionId) {
     if (mySessionId !== activeSessionId) {
         return;
@@ -845,7 +896,7 @@ function updateRealtimeTimeline(mySessionId) {
 
     if (!isPlayMode) {
         document.querySelectorAll('.timeline-playhead').forEach(ph => ph.style.opacity = '0');
-        playAnimationId = null; // 루프 플래그 리셋 후 탈출
+        playAnimationId = null; // 猷⑦봽 ?뚮옒洹?由ъ뀑 ???덉텧
         return;
     }
     
@@ -875,7 +926,7 @@ function updateRealtimeTimeline(mySessionId) {
             
             restoreEditMode();
             if (typeof showStatus === 'function') {
-                showStatus("연출 완료!");
+                showStatus("?곗텧 ?꾨즺!");
             }
             return;
         }
@@ -884,25 +935,25 @@ function updateRealtimeTimeline(mySessionId) {
 
     renderItemsFrame();
 
-    // [소프트웨어 다이내믹 BGM 더킹] Web Audio API 바이패스 모드 (CORS 제한 file:// 프로토콜 등) 대응을 위한 
-    // 하이브리드 타임라인 연동형 BGM 자동 음압 보정 시스템
+    // [?뚰봽?몄썾???ㅼ씠?대? BGM ?뷀궧] Web Audio API 諛붿씠?⑥뒪 紐⑤뱶 (CORS ?쒗븳 file:// ?꾨줈?좎퐳 ?? ??묒쓣 ?꾪븳 
+    // ?섏씠釉뚮━????꾨씪???곕룞??BGM ?먮룞 ?뚯븬 蹂댁젙 ?쒖뒪??
     const isLocalFileMode = window.location.protocol === 'file:';
     if (isLocalFileMode && window.activeBgms) {
-        // 현재 타임라인상 활성화(재생) 중인 대사(Dialogue) 보이스가 있는지 감지
+        // ?꾩옱 ??꾨씪?몄긽 ?쒖꽦???ъ깮) 以묒씤 ???Dialogue) 蹂댁씠?ㅺ? ?덈뒗吏 媛먯?
         const isVoicePlaying = playItemsQueue.some(item => {
             if (!item.isDialogue) return false;
             const elapsed = accumulatedTime - item.startSec;
             return elapsed >= 0 && elapsed < item.duration;
         });
 
-        // 보이스 재생 중일 때는 BGM을 0.06(매우 낮춤), 그 외에는 0.25(표준 배경음)로 설정 (단, 음소거 시에는 강제 0.0)
+        // 蹂댁씠???ъ깮 以묒씪 ?뚮뒗 BGM??0.06(留ㅼ슦 ??땄), 洹??몄뿉??0.25(?쒖? 諛곌꼍??濡??ㅼ젙 (?? ?뚯냼嫄??쒖뿉??媛뺤젣 0.0)
         const targetBgmVol = window.isBgmVolumeMuted ? 0.0 : (isVoicePlaying ? 0.06 : 0.25);
 
-        // activeBgms 객체 순회하여 각 BGM 트랙의 오디오 엘리먼트 볼륨을 60fps로 매끄럽게 피드백 조절 (100ms 이내 수렴)
+        // activeBgms 媛앹껜 ?쒗쉶?섏뿬 媛?BGM ?몃옓???ㅻ뵒???섎━癒쇳듃 蹂쇰ⅷ??60fps濡?留ㅻ걚?쎄쾶 ?쇰뱶諛?議곗젅 (100ms ?대궡 ?섎졃)
         Object.values(window.activeBgms).forEach(track => {
             if (track.isPlaying && track.audio && !track.audio.fadeTimer) {
                 const currentVol = track.audio.volume;
-                // 매끄러운 선형 보간 감쇄/복구 (lerp)
+                // 留ㅻ걚?ъ슫 ?좏삎 蹂닿컙 媛먯뇙/蹂듦뎄 (lerp)
                 track.audio.volume = currentVol + (targetBgmVol - currentVol) * 0.1;
             }
         });
@@ -938,21 +989,21 @@ function updateRealtimeTimeline(mySessionId) {
     playAnimationId = requestAnimationFrame(() => updateRealtimeTimeline(mySessionId));
 }
 
-// 0.0초 시점부터 시네마틱 자동 연출을 완전히 깨끗하게 오토플레이 기동
+// 0.0珥??쒖젏遺???쒕꽕留덊떛 ?먮룞 ?곗텧???꾩쟾??源⑤걮?섍쾶 ?ㅽ넗?뚮젅??湲곕룞
 function triggerAutoplayForCurrentCut() {
     isTimeBasedAutoplay = true; 
     accumulatedTime = 0.0;     
     lastFrameTime = performance.now(); 
     isProgrammaticPlaying = false; 
-    window.autoplayStartTime = performance.now(); // 오토플레이 시작 타임스탬프 기록 (미세 관성 가드용)
+    window.autoplayStartTime = performance.now(); // ?ㅽ넗?뚮젅???쒖옉 ??꾩뒪?ы봽 湲곕줉 (誘몄꽭 愿??媛?쒖슜)
 
-    // 빨리감기 상태가 아니면 배율을 1.0으로 리셋
+    // 鍮⑤━媛먭린 ?곹깭媛 ?꾨땲硫?諛곗쑉??1.0?쇰줈 由ъ뀑
     if (!isFastForwarding) {
         speedMultiplier = 1.0; 
     }
     updatePlayingAudiosPlaybackRate(); 
 
-    // 해당 컷 연출 효과를 0% 상태로 선제 락킹하여 1프레임 튀는 결함을 완전히 차단합니다.
+    // ?대떦 而??곗텧 ?④낵瑜?0% ?곹깭濡??좎젣 ?쏀궧?섏뿬 1?꾨젅?????寃고븿???꾩쟾??李⑤떒?⑸땲??
     renderCutVisualEffects(currentCutId, 0, true);
 
     buildPlayItemsQueue(currentCutId);
@@ -961,7 +1012,7 @@ function triggerAutoplayForCurrentCut() {
     activeSessionId = mySessionId;
     isPlayMode = true;
 
-    // 만약 오디오 컨텍스트가 존재하면 resume 보장
+    // 留뚯빟 ?ㅻ뵒??而⑦뀓?ㅽ듃媛 議댁옱?섎㈃ resume 蹂댁옣
     if (audioPipeManager.ctx) {
         audioPipeManager.ctx.resume().catch(() => {});
     }
@@ -969,13 +1020,13 @@ function triggerAutoplayForCurrentCut() {
     updateRealtimeTimeline(mySessionId);
 }
 
-// 자동 연출 완료 또는 중단 시 일반 수동 모드로 부드럽게 원복시키는 복구용 헬퍼 함수
+// ?먮룞 ?곗텧 ?꾨즺 ?먮뒗 以묐떒 ???쇰컲 ?섎룞 紐⑤뱶濡?遺?쒕읇寃??먮났?쒗궎??蹂듦뎄???ы띁 ?⑥닔
 function restoreEditMode() {
     isTimeBasedAutoplay = false; 
     isPlayMode = false;          
     isProgrammaticPlaying = false;
 
-    // 빨리감기가 아닐 때 배율 리셋
+    // 鍮⑤━媛먭린媛 ?꾨땺 ??諛곗쑉 由ъ뀑
     if (!isFastForwarding) {
         speedMultiplier = 1.0;
     }
@@ -988,19 +1039,19 @@ function restoreEditMode() {
         playAnimationId = null;
     }
 
-    // 컷 비주얼 효과 최종 상태(1.0) 복원
+    // 而?鍮꾩＜???④낵 理쒖쥌 ?곹깭(1.0) 蹂듭썝
     if (currentCutId) {
         renderCutVisualEffects(currentCutId, 1.0, false);
     }
 
-    // 말풍선들의 인라인 opacity 리셋하여 CSS 트랜지션 클래스(show) 본연 상태로 원복
+    // 留먰뭾?좊뱾???몃씪??opacity 由ъ뀑?섏뿬 CSS ?몃옖吏???대옒??show) 蹂몄뿰 ?곹깭濡??먮났
     cuts.forEach(c => {
         const belongsToCurrentCut = c.id === currentCutId;
         const state = belongsToCurrentCut ? 'show' : 'hide';
         
         syncCutBubblesState(c.id, state);
         
-        // 런타임 뷰어 및 편집기 복구 연계
+        // ?고???酉곗뼱 諛??몄쭛湲?蹂듦뎄 ?곌퀎
         const activeSceneList = document.getElementById(`sceneList_${c.id}`);
         if (activeSceneList) {
             activeSceneList.querySelectorAll('.dialogue-item').forEach(card => {
@@ -1028,7 +1079,7 @@ function restoreEditMode() {
                         }
                     }
 
-                    void bubble.offsetWidth; // 리플로우
+                    void bubble.offsetWidth; // 由ы뵆濡쒖슦
 
                     bubble.style.transition = '';
                     bubble.style.opacity = '';
@@ -1047,26 +1098,26 @@ function restoreEditMode() {
         }
     });
 
-    // [편집기 전용 로직 복구 가드]
+    // [?몄쭛湲??꾩슜 濡쒖쭅 蹂듦뎄 媛??
     const playBtn = document.getElementById('playBtn');
     if (playBtn) {
-        playBtn.innerHTML = '▶ 현재 컷 연출 재생';
+        playBtn.innerHTML = '???꾩옱 而??곗텧 ?ъ깮';
         playBtn.className = 'play-btn';
     }
 
-    // 현재 편집 모드로 복구된 컷의 배경파일명 및 효과 셀렉터 리로드
+    // ?꾩옱 ?몄쭛 紐⑤뱶濡?蹂듦뎄??而룹쓽 諛곌꼍?뚯씪紐?諛??④낵 ??됲꽣 由щ줈??
     const activeCut = cuts.find(c => c.id === currentCutId);
     if (activeCut) {
         const cutImageName = document.getElementById('cutImageName');
         if (cutImageName) {
-            cutImageName.textContent = activeCut.bgImageName || '선택된 파일 없음';
+            cutImageName.textContent = activeCut.bgImageName || '?좏깮???뚯씪 ?놁쓬';
         }
         const cutEffectSelect = document.getElementById('cutEffectSelect');
         if (cutEffectSelect) {
             cutEffectSelect.value = activeCut.effectType || 'none';
         }
         
-        // 타임라인 플레이헤드 초기화
+        // ??꾨씪???뚮젅?댄뿤??珥덇린??
         const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
         if (activeSceneList) {
             activeSceneList.querySelectorAll('.timeline-playhead').forEach(ph => {
@@ -1077,7 +1128,7 @@ function restoreEditMode() {
     }
 }
 
-// 오디오 사운드 전체 소멸
+// ?ㅻ뵒???ъ슫???꾩껜 ?뚮㈇
 function stopAllAudios() {
     playingAudios.forEach(audio => {
         try {
@@ -1088,7 +1139,7 @@ function stopAllAudios() {
     playingAudios = [];
 }
 
-// 재생 중인 오디오 배속 변동 적용
+// ?ъ깮 以묒씤 ?ㅻ뵒??諛곗냽 蹂???곸슜
 function updatePlayingAudiosPlaybackRate() {
     playingAudios.forEach(audio => {
         try {
@@ -1097,7 +1148,7 @@ function updatePlayingAudiosPlaybackRate() {
     });
 }
 
-// 단일화된 연출 프레임 큐 빌더 (편집기 카드 및 런타임 뷰어 데이터 이중 구조 지원)
+// ?⑥씪?붾맂 ?곗텧 ?꾨젅????鍮뚮뜑 (?몄쭛湲?移대뱶 諛??고???酉곗뼱 ?곗씠???댁쨷 援ъ“ 吏??
 function buildPlayItemsQueue(cutId) {
     playItemsQueue = [];
     stopAllAudios();
@@ -1105,11 +1156,11 @@ function buildPlayItemsQueue(cutId) {
     const cut = cuts.find(c => c.id === cutId);
     if (!cut) return 0;
 
-    let maxDuration = 2.0; // 최소 재생 보장 시간
+    let maxDuration = 2.0; // 理쒖냼 ?ъ깮 蹂댁옣 ?쒓컙
     const activeSceneList = document.getElementById(`sceneList_${cutId}`);
 
     if (activeSceneList) {
-        // [1] 편집기 모드: DOM 카드를 직접 긁어서 실시간 연출 큐 구축
+        // [1] ?몄쭛湲?紐⑤뱶: DOM 移대뱶瑜?吏곸젒 湲곸뼱???ㅼ떆媛??곗텧 ??援ъ텞
         const dialogueCards = activeSceneList.querySelectorAll('.dialogue-item');
         dialogueCards.forEach(card => {
             const id = card.dataset.id;
@@ -1118,14 +1169,14 @@ function buildPlayItemsQueue(cutId) {
             const startSec = parseFloat(card.querySelector('.diag-start').value) || 0;
             const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
             
-            // 오디오 URL
+            // ?ㅻ뵒??URL
             const audioUrl = card.audioUrl || null;
             
-            // 캔버스 말풍선 매칭
+            // 罹붾쾭??留먰뭾??留ㅼ묶
             const bubble = card.bubbleDOM || document.querySelector(`.speech-bubble[data-card-id="${id}"]`);
             if (bubble) {
                 card.bubbleDOM = bubble;
-                // 1글자 단위 타이핑 래퍼 빌드
+                // 1湲???⑥쐞 ??댄븨 ?섑띁 鍮뚮뱶
                 prepareBubbleTyping(bubble, text);
             }
 
@@ -1170,7 +1221,7 @@ function buildPlayItemsQueue(cutId) {
             }
         });
     } else {
-        // [2] 런타임 뷰어 모드: cuts 선언 배열(data.json 로드 데이터)을 통해 큐 구축
+        // [2] ?고???酉곗뼱 紐⑤뱶: cuts ?좎뼵 諛곗뿴(data.json 濡쒕뱶 ?곗씠?????듯빐 ??援ъ텞
         if (cut.items && cut.items.length > 0) {
             cut.items.forEach(item => {
                 const startSec = parseFloat(item.start) || 0;
@@ -1208,18 +1259,18 @@ function buildPlayItemsQueue(cutId) {
     return playItemsQueue.length;
 }
 
-// 말풍선 내부 한 글자 단위 span 쪼개기 헬퍼 함수
+// 留먰뭾???대? ??湲???⑥쐞 span 履쇨컻湲??ы띁 ?⑥닔
 function prepareBubbleTyping(bubble, text) {
     const textLayer = bubble.querySelector('.bubble-text-layer');
     if (!textLayer) return;
 
-    // [성능 개선 5 - prepareBubbleTyping 텍스트 캐싱]
+    // [?깅뒫 媛쒖꽑 5 - prepareBubbleTyping ?띿뒪??罹먯떛]
     if (bubble.lastPreparedText === text) {
         return;
     }
     bubble.lastPreparedText = text;
 
-    // 강제 초기 상태 청소 (번쩍임 예방 및 opacity=0 락 적용)
+    // 媛뺤젣 珥덇린 ?곹깭 泥?냼 (踰덉찉???덈갑 諛?opacity=0 ???곸슜)
     bubble.style.transition = 'none';
     bubble.style.opacity = '0';
     
@@ -1238,9 +1289,9 @@ function prepareBubbleTyping(bubble, text) {
 
     bubble.classList.remove('show');
     bubble.classList.add('animate');
-    void bubble.offsetWidth; // Reflow 강제
+    void bubble.offsetWidth; // Reflow 媛뺤젣
 
-    // 글자 분할 래퍼 생성
+    // 湲??遺꾪븷 ?섑띁 ?앹꽦
     const rawText = text || '';
     textLayer.innerHTML = `<span class="typing-wrapper" style="opacity:1;"></span>`;
     const wrapper = textLayer.querySelector('.typing-wrapper');
@@ -1255,12 +1306,12 @@ function prepareBubbleTyping(bubble, text) {
 }
 
 // =========================================================================
-// 🔄 데이터 스키마 매핑(Mapping Schema) 및 리소스 경로 정규화 엔진 (viewer.js)
+// ?봽 ?곗씠???ㅽ궎留?留ㅽ븨(Mapping Schema) 諛?由ъ냼??寃쎈줈 ?뺢퇋???붿쭊 (viewer.js)
 // =========================================================================
 
 var autoplayStartTime = window.autoplayStartTime = window.autoplayStartTime || 0;
 
-// 프로퍼티 매핑 용 스키마 정의
+// ?꾨줈?쇳떚 留ㅽ븨 ???ㅽ궎留??뺤쓽
 const dialogueSchema = {
     id: ['id', 'ID'],
     type: ['type', 'Type'],
@@ -1296,34 +1347,34 @@ const bgmSchema = {
     startTime: ['startTime', 'start', 'startSec']
 };
 
-// 동적 오브젝트 키-밸류 매핑 유틸리티
+// ?숈쟻 ?ㅻ툕?앺듃 ??諛몃쪟 留ㅽ븨 ?좏떥由ы떚
 function mapObjectProperties(obj, schema) {
     if (!obj) return null;
     const mapped = {};
     for (const [standardKey, possibleKeys] of Object.entries(schema)) {
-        // 객체 내에 매치되는 첫 번째 키 인출
+        // 媛앹껜 ?댁뿉 留ㅼ튂?섎뒗 泥?踰덉㎏ ???몄텧
         const actualKey = possibleKeys.find(k => k in obj);
         if (actualKey !== undefined) {
             mapped[standardKey] = obj[actualKey];
         } else {
-            mapped[standardKey] = null; // 디폴트 널 바인딩
+            mapped[standardKey] = null; // ?뷀뤃????諛붿씤??
         }
     }
     return mapped;
 }
 
-// 전체 데이터 경로 정규화 재귀 탐색기
+// ?꾩껜 ?곗씠??寃쎈줈 ?뺢퇋???ш? ?먯깋湲?
 function normalizeProjectDataPaths(data) {
     if (!data) return data;
     
-    // 1. 글로벌 BGM 오디오 경로 정규화
+    // 1. 湲濡쒕쾶 BGM ?ㅻ뵒??寃쎈줈 ?뺢퇋??
     if (data.bgms && Array.isArray(data.bgms)) {
         data.bgms.forEach(b => {
             if (b.audioUrl) b.audioUrl = normalizeMediaPath(b.audioUrl);
         });
     }
     
-    // 2. 개별 컷 및 다중 레이어, 씬 아이템 오디오 경로 정규화
+    // 2. 媛쒕퀎 而?諛??ㅼ쨷 ?덉씠?? ???꾩씠???ㅻ뵒??寃쎈줈 ?뺢퇋??
     if (data.cuts && Array.isArray(data.cuts)) {
         data.cuts.forEach(c => {
             if (c.bgImage) c.bgImage = normalizeMediaPath(c.bgImage);
@@ -1343,7 +1394,7 @@ function normalizeProjectDataPaths(data) {
     return data;
 }
 
-// 표준 스키마 검증 및 경로 정규화 통합 어댑터 코어
+// ?쒖? ?ㅽ궎留?寃利?諛?寃쎈줈 ?뺢퇋???듯빀 ?대뙌??肄붿뼱
 function normalizeAndMapProjectData(data) {
     if (!data) return data;
 
@@ -1353,12 +1404,12 @@ function normalizeAndMapProjectData(data) {
         cuts: []
     };
 
-    // 1. 글로벌 BGM 매핑 및 마이그레이션
+    // 1. 湲濡쒕쾶 BGM 留ㅽ븨 諛?留덉씠洹몃젅?댁뀡
     if (data.bgms && Array.isArray(data.bgms)) {
         mappedData.bgms = data.bgms.map(b => mapObjectProperties(b, bgmSchema));
     }
 
-    // 2. 컷 데이터 매핑 및 하위 호환 마이그레이션
+    // 2. 而??곗씠??留ㅽ븨 諛??섏쐞 ?명솚 留덉씠洹몃젅?댁뀡
     if (data.cuts && Array.isArray(data.cuts)) {
         mappedData.cuts = data.cuts.map(c => {
             const mappedCut = {
@@ -1373,16 +1424,16 @@ function normalizeAndMapProjectData(data) {
                 items: []
             };
 
-            // 구버전(1.0) bgImage -> 신버전(2.0) layer3 승격 대응
+            // 援щ쾭??1.0) bgImage -> ?좊쾭??2.0) layer3 ?밴꺽 ???
             if (!mappedCut.layer3 && mappedCut.bgImage) {
                 mappedCut.layer3 = {
                     url: mappedCut.bgImage,
-                    name: mappedCut.bgImageName || "배경",
+                    name: mappedCut.bgImageName || "諛곌꼍",
                     type: "image"
                 };
             }
 
-            // 대사 및 효과음 아이템 매핑
+            // ???諛??④낵???꾩씠??留ㅽ븨
             if (c.items && Array.isArray(c.items)) {
                 mappedCut.items = c.items.map(item => {
                     const itemType = item.type || "";
@@ -1405,20 +1456,20 @@ function normalizeAndMapProjectData(data) {
         });
     }
 
-    // 3. 정규화 파이프라인 수행 후 반환
+    // 3. ?뺢퇋???뚯씠?꾨씪???섑뻾 ??諛섑솚
     return normalizeProjectDataPaths(mappedData);
 }
 
-// 글로벌 네임스페이스 바인딩 (HTML에서 호출 가능하도록)
+// 湲濡쒕쾶 ?ㅼ엫?ㅽ럹?댁뒪 諛붿씤??(HTML?먯꽌 ?몄텧 媛?ν븯?꾨줉)
 window.normalizeAndMapProjectData = normalizeAndMapProjectData;
 window.normalizeProjectDataPaths = normalizeProjectDataPaths;
 window.mapObjectProperties = mapObjectProperties;
 
 // =========================================================================
-// 🚀 [성능 개선 1 & 3] Lazy Rendering, Swap 및 이미지 풀링 핵심 모듈 (viewer.js)
+// ?? [?깅뒫 媛쒖꽑 1 & 3] Lazy Rendering, Swap 諛??대?吏 ?留??듭떖 紐⑤뱢 (viewer.js)
 // =========================================================================
 
-// 명암 대비 색상 계산기 (Contrast YIQ)
+// 紐낆븫 ?鍮??됱긽 怨꾩궛湲?(Contrast YIQ)
 function getContrastYIQ(hexcolor){
     if(!hexcolor) return '#111827';
     hexcolor = hexcolor.replace("#", "");
@@ -1430,7 +1481,7 @@ function getContrastYIQ(hexcolor){
 }
 window.getContrastYIQ = getContrastYIQ;
 
-// 말풍선 DOM 동적 생성기 (Swap-in 용)
+// 留먰뭾??DOM ?숈쟻 ?앹꽦湲?(Swap-in ??
 function createBubbleDOM(cutId, item) {
     const bubble = document.createElement('div');
     bubble.className = 'speech-bubble show';
@@ -1441,7 +1492,7 @@ function createBubbleDOM(cutId, item) {
     bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
     bubble.style.setProperty('--text-color', getContrastYIQ(item.charColor || '#ffffff'));
 
-    // 실시간 말꼬리 렌더링에 필요한 물리 속성들을 데이터셋으로 바인딩
+    // ?ㅼ떆媛?留먭섕由??뚮뜑留곸뿉 ?꾩슂??臾쇰━ ?띿꽦?ㅼ쓣 ?곗씠?곗뀑?쇰줈 諛붿씤??
     bubble.dataset.baseAngle = item.baseAngle || 45;
     bubble.dataset.tipDx = item.tipDx || 30;
     bubble.dataset.tipDy = item.tipDy || 30;
@@ -1455,17 +1506,17 @@ function createBubbleDOM(cutId, item) {
             <path class="bubble-path bubble-path-stroke" d="" style="fill: none; stroke: #111827; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; opacity: 1;" />
         </svg>
         <div class="bubble-text-layer">${item.text || ''}</div>
-        <div class="handle base-handle" title="뿌리 조절"></div><div class="handle tip-handle" title="꼬리 끝 조절"></div>
+        <div class="handle base-handle" title="肉뚮━ 議곗젅"></div><div class="handle tip-handle" title="瑗щ━ ??議곗젅"></div>
     `;
 
-    // 꼬리 그리기 함수 호출
+    // 瑗щ━ 洹몃━湲??⑥닔 ?몄텧
     if (typeof updateTail === 'function') {
         setTimeout(() => updateTail(bubble), 0);
     } else if (typeof updateTailRuntime === 'function') {
         setTimeout(() => updateTailRuntime(bubble, item.baseAngle, item.tipDx, item.tipDy, item.baseWidth), 0);
     }
     
-    // ResizeObserver 바인딩
+    // ResizeObserver 諛붿씤??
     const observer = window.resizeObserver;
     if (observer) {
         observer.observe(bubble);
@@ -1475,14 +1526,14 @@ function createBubbleDOM(cutId, item) {
 }
 window.createBubbleDOM = createBubbleDOM;
 
-// Active Cut 중심 Lazy Rendering & Swap 및 이미지 풀링 시스템
+// Active Cut 以묒떖 Lazy Rendering & Swap 諛??대?吏 ?留??쒖뒪??
 function swapActiveCutsDOM(activeCutId) {
     if (!cuts || cuts.length === 0) return;
     
     const activeCutIdx = cuts.findIndex(c => c.id === activeCutId);
     if (activeCutIdx === -1) return;
 
-    // 활성 윈도우 범위 결정 (활성 컷 + 앞/뒤 1컷)
+    // ?쒖꽦 ?덈룄??踰붿쐞 寃곗젙 (?쒖꽦 而?+ ????1而?
     const windowStart = Math.max(0, activeCutIdx - 1);
     const windowEnd = Math.min(cuts.length - 1, activeCutIdx + 1);
 
@@ -1493,19 +1544,19 @@ function swapActiveCutsDOM(activeCutId) {
         const inWindow = idx >= windowStart && idx <= windowEnd;
 
         if (inWindow) {
-            // Swap-in: 활성 범위에 속한 경우
-            // 1. 3중 레이어 생성
+            // Swap-in: ?쒖꽦 踰붿쐞???랁븳 寃쎌슦
+            // 1. 3以??덉씠???앹꽦
             const hasLayers = cutItem.querySelector('.cut-layer, .cut-bg-image');
             if (!hasLayers) {
                 if (typeof renderCutLayers === 'function') {
                     renderCutLayers(cutItem, cut);
                 } else {
-                    // viewer.html용 레이어 생성 폴백
+                    // viewer.html???덉씠???앹꽦 ?대갚
                     buildViewerLayersFallback(cutItem, cut);
                 }
             }
 
-            // 2. 말풍선 컨테이너 및 말풍선 DOM 생성
+            // 2. 留먰뭾??而⑦뀒?대꼫 諛?留먰뭾??DOM ?앹꽦
             let bubbleContainer = cutItem.querySelector('.bubble-container');
             if (!bubbleContainer) {
                 bubbleContainer = document.createElement('div');
@@ -1514,7 +1565,7 @@ function swapActiveCutsDOM(activeCutId) {
                 cutItem.appendChild(bubbleContainer);
             }
 
-            // 각 대사 아이템에 대해 말풍선 DOM 생성
+            // 媛?????꾩씠?쒖뿉 ???留먰뭾??DOM ?앹꽦
             const dialogueItems = (cut.items || []).filter(item => item.type === 'dialogue');
             dialogueItems.forEach(item => {
                 let bubble = document.getElementById(`bubble_${item.id}`) || bubbleContainer.querySelector(`[data-card-id="${item.id}"]`);
@@ -1523,15 +1574,15 @@ function swapActiveCutsDOM(activeCutId) {
                     bubbleContainer.appendChild(bubble);
                 }
                 
-                // 편집기 카드 바인딩 동기화
+                // ?몄쭛湲?移대뱶 諛붿씤???숆린??
                 const card = document.querySelector(`.dialogue-item[data-id="${item.id}"]`);
                 if (card) {
                     card.bubbleDOM = bubble;
                 }
             });
         } else {
-            // Swap-out (비활성 컷): 이미지 풀링 & 메모리 해제
-            // 1. 비디오 해제 및 레이어 DOM 제거
+            // Swap-out (鍮꾪솢??而?: ?대?吏 ?留?& 硫붾え由??댁젣
+            // 1. 鍮꾨뵒???댁젣 諛??덉씠??DOM ?쒓굅
             const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
             layers.forEach(layer => {
                 if (layer.tagName === 'VIDEO') {
@@ -1544,7 +1595,7 @@ function swapActiveCutsDOM(activeCutId) {
                 layer.remove();
             });
 
-            // 2. 말풍선 DOM 및 컨테이너 비우기
+            // 2. 留먰뭾??DOM 諛?而⑦뀒?대꼫 鍮꾩슦湲?
             const bubbleContainer = cutItem.querySelector('.bubble-container');
             if (bubbleContainer) {
                 const observer = window.resizeObserver;
@@ -1558,7 +1609,7 @@ function swapActiveCutsDOM(activeCutId) {
                 bubbleContainer.innerHTML = "";
             }
 
-            // 3. 씬 리스트 카드의 bubbleDOM 해제
+            // 3. ??由ъ뒪??移대뱶??bubbleDOM ?댁젣
             const dialogueItems = (cut.items || []).filter(item => item.type === 'dialogue');
             dialogueItems.forEach(item => {
                 const card = document.querySelector(`.dialogue-item[data-id="${item.id}"]`);
@@ -1571,7 +1622,7 @@ function swapActiveCutsDOM(activeCutId) {
 }
 window.swapActiveCutsDOM = swapActiveCutsDOM;
 
-// viewer.html용 레이어 생성 헬퍼
+// viewer.html???덉씠???앹꽦 ?ы띁
 function buildViewerLayersFallback(cutItem, c) {
     function buildLayer(layerIndex, layerObj) {
         if (!layerObj || !layerObj.url) return null;
@@ -1589,7 +1640,7 @@ function buildViewerLayersFallback(cutItem, c) {
             el.setAttribute('muted', '');
             el.setAttribute('playsinline', '');
 
-            // 첫 번째 컷(Index 1) 비디오 로드 완료 감시
+            // 泥?踰덉㎏ 而?Index 1) 鍮꾨뵒??濡쒕뱶 ?꾨즺 媛먯떆
             if (c.index === 1) {
                 el.addEventListener('loadeddata', () => {
                     cutItem.style.transition = 'opacity 0.3s ease';
@@ -1600,7 +1651,7 @@ function buildViewerLayersFallback(cutItem, c) {
             el = document.createElement('div');
             el.style.backgroundImage = `url(${normalizeMediaPath(layerObj.url)})`;
 
-            // 첫 번째 컷(Index 1) 이미지 로드 완료 감시
+            // 泥?踰덉㎏ 而?Index 1) ?대?吏 濡쒕뱶 ?꾨즺 媛먯떆
             if (c.index === 1) {
                 const img = new Image();
                 img.onload = () => {
@@ -1619,7 +1670,7 @@ function buildViewerLayersFallback(cutItem, c) {
         else if (layerIndex === 2) el.style.zIndex = '2';
         else if (layerIndex === 1) el.style.zIndex = '3';
 
-        // 연출 효과 타입 적용
+        // ?곗텧 ?④낵 ????곸슜
         if (c.effectType && c.effectType !== 'none' && c.effectType !== 'shake') {
             el.classList.add(`effect-${c.effectType}`);
         }
@@ -1627,7 +1678,7 @@ function buildViewerLayersFallback(cutItem, c) {
         return el;
     }
 
-    const l3 = buildLayer(3, c.layer3 || (c.bgImage ? { url: c.bgImage, name: c.bgImageName || '배경', type: 'image' } : null));
+    const l3 = buildLayer(3, c.layer3 || (c.bgImage ? { url: c.bgImage, name: c.bgImageName || '諛곌꼍', type: 'image' } : null));
     const l2 = buildLayer(2, c.layer2);
     const l1 = buildLayer(1, c.layer1);
 
@@ -1641,4 +1692,3 @@ function buildViewerLayersFallback(cutItem, c) {
         cutItem.classList.add('effect-shake');
     }
 }
-

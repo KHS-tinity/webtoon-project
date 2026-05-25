@@ -1,0 +1,94 @@
+{
+  "bgms": [
+    {
+      "id": "bgm_1",
+      "name": "대항해시대2 Ost - Menu Theme",
+      "audioUrl": "대항해시대2 Ost - Menu Theme(AI).mp3",
+      "startCut": 1,
+      "endCut": 2,
+      "startTime": 0.0
+    },
+    {
+      "id": "bgm_2",
+      "name": "Uncharted Waters - 01 Opening",
+      "audioUrl": "Uncharted Waters - 01 Opening.mp3",
+      "startCut": 3,
+      "endCut": 3,
+      "startTime": 0.0
+    }
+  ],
+  "cuts": [
+    {
+      "id": "cut_0",
+      "index": 1,
+      "bgImageName": "1.jpg",
+      "bgImage": "1.jpg",
+      "effectType": "fade",
+      "items": [
+        {
+          "id": "item_0",
+          "type": "dialogue",
+          "charName": "페레로",
+          "charColor": "#e0e7ff",
+          "text": "이곳이 바로... 소문으로만 듣던 신비의 섬인가?",
+          "audioUrl": "녹음.m4a",
+          "start": 0.5,
+          "duration": 3.0,
+          "x": 15.0,
+          "y": 20.0,
+          "baseAngle": 45.0,
+          "tipDx": 35.0,
+          "tipDy": 35.0
+        }
+      ]
+    },
+    {
+      "id": "cut_1",
+      "index": 2,
+      "bgImageName": "2.jpg",
+      "bgImage": "2.jpg",
+      "effectType": "shake",
+      "items": [
+        {
+          "id": "item_1",
+          "type": "dialogue",
+          "charName": "알 베자스",
+          "charColor": "#fee2e2",
+          "text": "으윽! 갑자기 거대한 해일이 몰려오고 있다! 쾅!!",
+          "audioUrl": "녹음.m4a",
+          "start": 0.2,
+          "duration": 3.5,
+          "x": 20.0,
+          "y": 50.0,
+          "baseAngle": 135.0,
+          "tipDx": -40.0,
+          "tipDy": 40.0
+        }
+      ]
+    },
+    {
+      "id": "cut_2",
+      "index": 3,
+      "bgImageName": "3.jpg",
+      "bgImage": "3.jpg",
+      "effectType": "zoom",
+      "items": [
+        {
+          "id": "item_2",
+          "type": "dialogue",
+          "charName": "페레로",
+          "charColor": "#e0e7ff",
+          "text": "모두 돛을 올리고 전속력으로 탈출하라!!",
+          "audioUrl": "녹음.m4a",
+          "start": 0.4,
+          "duration": 3.0,
+          "x": 15.0,
+          "y": 30.0,
+          "baseAngle": 60.0,
+          "tipDx": 40.0,
+          "tipDy": 40.0
+        }
+      ]
+    }
+  ]
+}

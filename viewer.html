@@ -1,1128 +1,1535 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>모션 웹툰 뷰어 (Motion Webtoon Viewer)</title>
-  <!-- Google Fonts & Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-  <style>
-    :root {
-      --bg-dark: #0a0b0e;
-      --panel-bg: rgba(20, 22, 30, 0.75);
-      --panel-border: rgba(255, 255, 255, 0.08);
-      --accent: #8b5cf6;
-      --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
-      --accent-glow: rgba(139, 92, 246, 0.4);
-      --text-light: #f8fafc;
-      --text-muted: #94a3b8;
-    }
+    <script>
+        window.addEventListener('error', function(e) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '0';
+            errorDiv.style.left = '0';
+            errorDiv.style.width = '100%';
+            errorDiv.style.backgroundColor = '#ef4444';
+            errorDiv.style.color = '#ffffff';
+            errorDiv.style.padding = '1rem';
+            errorDiv.style.zIndex = '999999';
+            errorDiv.style.fontSize = '14px';
+            errorDiv.style.fontFamily = 'monospace';
+            errorDiv.style.whiteSpace = 'pre-wrap';
+            errorDiv.innerHTML = '<strong>[JS Runtime Error]</strong> ' + e.message + '<br>Line: ' + e.lineno + ' | Col: ' + e.colno + '<br>File: ' + e.filename + (e.error && e.error.stack ? '<br><br>' + e.error.stack.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '');
+            document.body.appendChild(errorDiv);
+        });
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시네마틱 웹툰 사운드 뷰어 Runtime</title>
+    <!-- Google Fonts & Pretendard CDN -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient-start: #0f172a;
+            --bg-gradient-end: #020617;
+            --device-bg: #1e293b;
+            --glow-color: rgba(99, 102, 241, 0.15);
+            --bubble-text-color: #111827;
+            --accent-color: #6366f1;
+        }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-drag: none;
-    }
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            color: #f8fafc;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
 
-    body {
-      background-color: var(--bg-dark);
-      color: var(--text-light);
-      font-family: 'Noto Sans KR', sans-serif;
-      overflow: hidden;
-      width: 100vw;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
+        /* 입체감 있는 외곽 광채 모바일 프레임 */
+        .viewport-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-    /* Screen Wrapper: Locks webtoon inside standard comic aspect ratio */
-    #screen-wrapper {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      max-width: 560px; /* Standard webtoon mobile width */
-      max-height: 900px;
-      aspect-ratio: 9 / 16;
-      background: #000;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(139, 92, 246, 0.1);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-    }
+        .device-glow {
+            position: absolute;
+            top: -20px; left: -20px; right: -20px; bottom: -20px;
+            background: radial-gradient(circle, var(--glow-color) 0%, transparent 70%);
+            z-index: -1;
+            border-radius: 3.5rem;
+            filter: blur(15px);
+            pointer-events: none;
+        }
 
-    /* Viewport containing cut imagery and speech bubbles */
-    #webtoon-viewport {
-      position: relative;
-      width: 100%;
-      flex-grow: 1;
-      overflow: hidden;
-      background: #000;
-    }
+        .mobile-frame {
+            width: 360px;
+            height: 740px;
+            background-color: #1e293b;
+            border-radius: 3rem;
+            box-shadow: 
+                0 0 0 12px #1e293b, 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.08);
+        }
 
-    .bg-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
+        /* 아이폰 스타일 상단 아일랜드 노치 */
+        .mobile-frame::before {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 110px;
+            height: 28px;
+            background-color: #0f172a;
+            border-radius: 14px;
+            z-index: 100;
+            pointer-events: none;
+            box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.1);
+        }
 
-    #cut-background {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform-origin: center center;
-      will-change: transform;
-    }
+        /* 런타임 스냅 스크롤 캔버스 */
+        .viewer-scroll-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            background-color: #090d16;
+        }
+        .viewer-scroll-container::-webkit-scrollbar {
+            display: none;
+        }
 
-    /* Speech Bubble Overlay Layer */
-    .bubble-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 10;
-      pointer-events: none;
-    }
+        .viewer-cut-item {
+            width: 100%;
+            height: 100%;
+            flex-shrink: 0;
+            position: relative;
+            scroll-snap-align: start;
+            overflow: hidden;
+            background-color: #0f172a;
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
+            transition: transform 0.5s ease;
+        }
 
-    /* Bubble structural layout */
-    .bubble-wrapper {
-      position: absolute;
-      pointer-events: auto;
-      opacity: 0;
-      transform: scale(0.4);
-      transform-origin: center center;
-    }
+        .cut-bg-image, .cut-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            pointer-events: none;
+            object-fit: cover; /* WebM 비디오 자동 비율 크기 채우기 대응 */
+        }
 
-    /* CSS POP KEYFRAME ANIMATION - Separate from typing */
-    @keyframes bubble-pop {
-      0% {
-        transform: scale(0.4);
-        opacity: 0;
-      }
-      60% {
-        transform: scale(1.1);
-        opacity: 1;
-      }
-      85% {
-        transform: scale(0.95);
-      }
-      100% {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
+        .cut-bg-image {
+            z-index: 1;
+        }
 
-    .bubble-wrapper.active {
-      animation: bubble-pop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards;
-    }
+        /* 60fps GPU 가속 연출 필터 및 트랜지션 정의 */
+        .cut-bg-image.effect-fade, .cut-layer.effect-fade {
+            opacity: 0;
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-fade,
+        .viewer-cut-item.active .cut-layer.effect-fade {
+            opacity: 1;
+        }
 
-    /* Bubble background styles (Visual frame) */
-    .bubble-bg-layer {
-      position: relative;
-      padding: 14px 20px;
-      border-radius: 18px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-      min-width: 100px;
-      max-width: 260px;
-      border-width: 2px;
-      border-style: solid;
-      line-height: 1.5;
-      font-size: 1rem;
-      font-weight: 500;
-      color: transparent !important; /* Hide original layout text */
-      word-break: keep-all;
-    }
+        .cut-bg-image.effect-slide-up, .cut-layer.effect-slide-up {
+            transform: translateY(120px);
+            opacity: 0;
+            transition: transform 0.9s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.8s ease;
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-slide-up,
+        .viewer-cut-item.active .cut-layer.effect-slide-up {
+            transform: translateY(0);
+            opacity: 1;
+        }
 
-    /* Bubble text layer (Physically separated from frame) */
-    .bubble-text-layer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      padding: 14px 20px;
-      font-size: 1rem;
-      font-weight: 500;
-      line-height: 1.5;
-      word-break: keep-all;
-      pointer-events: none;
-      z-index: 2;
-      display: flex;
-      flex-wrap: wrap;
-      align-content: flex-start;
-    }
+        .cut-bg-image.effect-zoom, .cut-layer.effect-zoom {
+            transform: scale(1.35);
+            opacity: 0;
+            transition: transform 1.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 1s ease;
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-zoom,
+        .viewer-cut-item.active .cut-layer.effect-zoom {
+            transform: scale(1);
+            opacity: 1;
+        }
 
-    /* Character span overrides */
-    .bubble-text-layer span {
-      display: inline-block;
-      white-space: pre-wrap;
-      opacity: 0;
-      /* ABSOLUTELY EXCLUDE CSS TRANSITIONS */
-      transition: none !important;
-    }
+        .viewer-cut-item.effect-shake.active {
+            animation: viewerShake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
 
-    /* Theme Styles for Bubble Frames */
-    .bubble-style-thought .bubble-bg-layer {
-      border-radius: 30px;
-    }
-    .bubble-style-thought .bubble-bg-layer::after,
-    .bubble-style-thought .bubble-bg-layer::before {
-      content: '';
-      position: absolute;
-      background: inherit;
-      border: inherit;
-      border-radius: 50%;
-    }
-    .bubble-style-thought .bubble-bg-layer::after {
-      width: 16px;
-      height: 16px;
-      bottom: -10px;
-      left: 20%;
-    }
-    .bubble-style-thought .bubble-bg-layer::before {
-      width: 8px;
-      height: 8px;
-      bottom: -16px;
-      left: 15%;
-    }
+        @keyframes viewerShake {
+            10%, 90% { transform: translate3d(-4px, -3px, 0); }
+            20%, 80% { transform: translate3d(6px, 5px, 0); }
+            30%, 50%, 70% { transform: translate3d(-11px, 3px, 0); }
+            40%, 60% { transform: translate3d(11px, -5px, 0); }
+        }
 
-    .bubble-style-shout .bubble-bg-layer {
-      font-weight: 700;
-      clip-path: polygon(
-        0% 15%, 12% 10%, 15% 0%, 25% 8%, 38% 3%, 45% 10%, 60% 0%, 65% 12%, 80% 5%, 85% 14%, 96% 8%, 92% 28%, 100% 40%, 91% 52%, 98% 70%, 86% 75%, 88% 94%, 73% 85%, 60% 98%, 52% 86%, 35% 92%, 30% 80%, 15% 90%, 18% 72%, 5% 75%, 8% 55%, 0% 45%, 9% 30%
-      );
-      padding: 24px 28px;
-      border: none !important; /* Clip path clips borders, so background handles style */
-    }
-    .bubble-style-shout .bubble-text-layer {
-      padding: 24px 28px;
-      font-weight: 700;
-    }
+        /* 말풍선 공통 스타일 */
+        .bubble-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
 
-    .bubble-style-modern .bubble-bg-layer {
-      border-radius: 12px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-    }
-    .bubble-style-modern .bubble-bg-layer::after {
-      content: '';
-      position: absolute;
-      bottom: -8px;
-      left: 24px;
-      width: 0;
-      height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-top: 8px solid var(--accent); /* will fall back or resolve dynamic border */
-      border-top-color: inherit;
-    }
+        .speech-bubble {
+            position: absolute;
+            max-width: 75%;
+            padding: 0.9rem 1.35rem;
+            border-radius: 1.35rem;
+            font-size: 1.05rem;
+            font-weight: 700;
+            line-height: 1.5;
+            word-break: keep-all;
+            transform: scale(0.6) translateY(20px);
+            opacity: 0;
+            z-index: 10;
+            color: var(--bubble-text-color);
+            background-color: transparent;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+        }
 
-    .bubble-style-retro .bubble-bg-layer {
-      border-radius: 0px;
-      border-width: 4px;
-      box-shadow: 6px 6px 0px #000;
-    }
-    .bubble-style-retro .bubble-bg-layer::after {
-      content: '';
-      position: absolute;
-      bottom: -16px;
-      left: 20px;
-      width: 16px;
-      height: 16px;
-      background: inherit;
-      border: inherit;
-      border-top: none;
-      border-right: none;
-      transform: rotate(-45deg);
-      transform-origin: top left;
-    }
+        .bubble-text-layer {
+            position: relative;
+            z-index: 10;
+            pointer-events: none;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
 
-    /* Timeline & Control Panel Dashboard */
-    #dashboard {
-      background: var(--panel-bg);
-      backdrop-filter: blur(20px);
-      border-top: 1px solid var(--panel-border);
-      padding: 16px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      z-index: 20;
-    }
+        .bubble-shadow-layer {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: inherit;
+            z-index: -2;
+            pointer-events: none;
+        }
 
-    /* Time scrub progress bar container */
-    .scrub-container {
-      position: relative;
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-    }
-    .scrub-container:hover .scrub-handle {
-      transform: scale(1.3);
-    }
-    .scrub-progress {
-      height: 100%;
-      background: var(--accent-gradient);
-      border-radius: 3px;
-      width: 0%;
-      pointer-events: none;
-    }
-    .scrub-handle {
-      position: absolute;
-      left: 0%;
-      width: 12px;
-      height: 12px;
-      background: #fff;
-      border-radius: 50%;
-      box-shadow: 0 0 10px var(--accent);
-      transform: translateX(-50%);
-      transition: transform 0.1s ease;
-      pointer-events: none;
-    }
+        .speech-bubble.animate {
+            opacity: 0;
+            transform: scale(0.6) translateY(20px);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease, left 0.3s ease, top 0.3s ease;
+        }
 
-    /* Bubble tick marks on timeline */
-    .bubble-tick {
-      position: absolute;
-      width: 4px;
-      height: 12px;
-      background: #06b6d4;
-      top: -3px;
-      border-radius: 2px;
-      opacity: 0.7;
-      transform: translateX(-200%);
-    }
+        .speech-bubble.animate .tail-svg,
+        .speech-bubble.animate .bubble-path {
+            opacity: 0;
+            transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
 
-    /* Control Button Row */
-    .controls-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+        .speech-bubble.show {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
 
-    .btn-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .speech-bubble.show .tail-svg,
+        .speech-bubble.show .bubble-path {
+            opacity: 1;
+        }
 
-    .control-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: var(--text-light);
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .control-btn:hover {
-      background: var(--accent-gradient);
-      border-color: transparent;
-      box-shadow: 0 0 15px var(--accent-glow);
-      transform: translateY(-2px);
-    }
-    .control-btn:active {
-      transform: translateY(0);
-    }
+        .typing-wrapper span {
+            opacity: 0;
+            display: inline;
+        }
 
-    .cut-indicator {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-      font-family: 'Outfit', sans-serif;
-    }
+        .tail-svg {
+            position: absolute;
+            top: -500px;
+            left: -500px;
+            width: 1000px;
+            height: 1000px;
+            pointer-events: none;
+            z-index: 3;
+        }
 
-    .cut-time-display {
-      font-size: 0.8rem;
-      font-family: 'Outfit', sans-serif;
-      color: var(--text-muted);
-    }
+        .bubble-bg-cover {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: inherit;
+            background-color: var(--bubble-color, #ffffff);
+            border: 2.5px solid #111827;
+            box-sizing: border-box;
+            z-index: 2;
+            pointer-events: none;
+        }
 
-    /* Sound Volume bar */
-    .volume-container {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--text-muted);
-    }
-    .volume-slider {
-      width: 70px;
-      -webkit-appearance: none;
-      background: rgba(255, 255, 255, 0.15);
-      height: 4px;
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
-    .volume-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--text-light);
-    }
+        /* 글래스모피즘 오디오 락 해제 안내 인트로 레이어 */
+        .intro-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
 
-    /* State Lock Landing Screen Overlay */
-    #lock-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle at center, #1b1330 0%, #07070b 100%);
-      z-index: 100;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 30px;
-      text-align: center;
-      transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s;
-    }
+        .intro-card {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 2.2rem 1.8rem;
+            border-radius: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            max-width: 290px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform: scale(0.95);
+            animation: cardEntrance 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
 
-    #lock-screen.unlocked {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
+        @keyframes cardEntrance {
+            to { transform: scale(1); }
+        }
 
-    .lock-logo {
-      font-family: 'Outfit', sans-serif;
-      font-weight: 800;
-      font-size: 2.2rem;
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #c084fc 0%, #22d3ee 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.3));
-    }
+        .intro-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.4));
+            animation: pulseGlow 2s infinite alternate;
+        }
 
-    .lock-subtitle {
-      font-size: 1.1rem;
-      color: var(--text-light);
-      font-weight: 600;
-      margin-bottom: 24px;
-      word-break: keep-all;
-    }
+        @keyframes pulseGlow {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.08); }
+        }
 
-    .lock-description {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 40px;
-      line-height: 1.6;
-      word-break: keep-all;
-    }
+        .intro-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+        }
 
-    .start-btn {
-      position: relative;
-      background: var(--accent-gradient);
-      color: white;
-      padding: 16px 42px;
-      font-size: 1.1rem;
-      font-weight: 700;
-      border: none;
-      border-radius: 30px;
-      cursor: pointer;
-      box-shadow: 0 10px 30px var(--accent-glow);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .start-btn::before {
-      content: '';
-      position: absolute;
-      top: -2px;
-      left: -2px;
-      right: -2px;
-      bottom: -2px;
-      border-radius: 32px;
-      background: var(--accent-gradient);
-      z-index: -1;
-      filter: blur(8px);
-      opacity: 0.7;
-    }
+        .intro-desc {
+            font-size: 0.88rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            word-break: keep-all;
+        }
 
-    .start-btn:hover {
-      transform: scale(1.05) translateY(-3px);
-      box-shadow: 0 15px 35px var(--accent-glow);
-    }
-    .start-btn:active {
-      transform: scale(0.98) translateY(0);
-    }
+        .intro-btn {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.6rem;
+            border-radius: 1rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
 
-    .pulse-ring {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      border: 2px solid var(--accent);
-      border-radius: 32px;
-      animation: pulse-ring-anim 2s infinite;
-      z-index: -1;
-    }
+        .intro-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(99, 102, 241, 0.5);
+        }
 
-    @keyframes pulse-ring-anim {
-      0% {
-        transform: scale(0.95);
-        opacity: 0.8;
-      }
-      100% {
-        transform: scale(1.3);
-        opacity: 0;
-      }
-    }
+        .intro-badge {
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #6366f1;
+            background: rgba(99, 102, 241, 0.15);
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            margin-bottom: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
 
-    /* Finished End Screen Overlay */
-    #end-screen {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(10, 11, 14, 0.95);
-      z-index: 50;
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-    }
-    #end-screen.visible {
-      display: flex;
-    }
-    .end-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #fff;
-    }
-    .replay-btn {
-      background: var(--accent-gradient);
-      border: none;
-      color: #fff;
-      padding: 12px 28px;
-      border-radius: 20px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: transform 0.2s ease;
-    }
-    .replay-btn:hover {
-      transform: translateY(-2px);
-    }
+        /* 하단 오토플레이 안내 플로터 */
+        .viewer-floater {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #94a3b8;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            pointer-events: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
 
-    /* Floating editor return link */
-    .editor-link {
-      position: absolute;
-      top: 15px;
-      left: 15px;
-      background: rgba(10, 11, 14, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: var(--text-light);
-      padding: 8px 14px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 500;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      z-index: 90;
-      backdrop-filter: blur(10px);
-      transition: all 0.2s ease;
-    }
-    .editor-link:hover {
-      background: var(--text-light);
-      color: var(--bg-dark);
-      border-color: #fff;
-    }
-  </style>
+        .floater-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            animation: blink 1.2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        /* 프리미엄 BGM 토글 버튼 스타일 */
+        .bgm-toggle-btn {
+            position: absolute;
+            top: 52px;
+            left: 20px;
+            width: 38px;
+            height: 38px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            z-index: 450;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .bgm-toggle-btn:hover {
+            transform: scale(1.08);
+            background: rgba(15, 23, 42, 0.85);
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+        }
+        .bgm-toggle-btn.muted {
+            border-color: rgba(239, 68, 68, 0.4);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
+        }
+    </style>
 </head>
 <body>
 
-  <div id="screen-wrapper">
-    
-    <!-- State Lock Screen Overlay -->
-    <div id="lock-screen">
-      <div class="lock-logo">NAVIGATOR</div>
-      <div class="lock-subtitle" id="webtoon-title-lock">대항해시대: 푸른 심연의 부름</div>
-      <p class="lock-description">
-        본 연출은 사운드, 모션 카메라, 말풍선 타이핑 연출이<br>
-        실시간 타임라인으로 결합된 모션 웹툰입니다.<br>
-        소리를 켜고 아래 감상하기 버튼을 클릭해 주세요.
-      </p>
-      <button class="start-btn" id="btn-start">
-        <span class="material-icons-round">play_arrow</span>
-        감상 시작하기
-        <div class="pulse-ring"></div>
-      </button>
-    </div>
+    <div class="viewport-wrapper">
+        <div class="device-glow"></div>
+        <div class="mobile-frame" id="mobileFrame">
+            <!-- 배경음악 끄기 버튼 (FAB) -->
+            <button class="bgm-toggle-btn" id="bgmToggleBtn" title="배경음악 켜기/끄기">🎵</button>
+            
+            <!-- 오디오 자동 차단 해제 카드 안내 레이어 -->
+            <div class="intro-overlay" id="introOverlay">
+                <div class="intro-card">
+                    <div class="intro-badge">Sound & Motion</div>
+                    <div class="intro-icon">🎬</div>
+                    <div class="intro-title">Cinematic Director</div>
+                    <div class="intro-desc">본 작품은 대사별 성우 보이스, 60fps 연출 효과 및 장면 배경음악(BGM)이 내장되어 있습니다. 터치하여 연출을 시작해 주세요.</div>
+                    <button class="intro-btn">감상 시작하기</button>
+                </div>
+            </div>
 
-    <!-- Quick editor link -->
-    <a href="index.html" class="editor-link">
-      <span class="material-icons-round">edit</span>
-      편집기로 이동
-    </a>
+            <!-- 하단 안내 플로터 -->
+            <div class="viewer-floater">
+                <div class="floater-dot"></div>
+                <span>스크롤 또는 Hold 시 빨리 감기</span>
+            </div>
 
-    <!-- Render viewport -->
-    <div id="webtoon-viewport">
-      <!-- Cut rendering layout created dynamically -->
-    </div>
+            <!-- 독립 실행형 런타임 뷰어 스냅 스크롤 컨테이너 -->
+            <div class="viewer-scroll-container" id="viewerScrollContainer">
+                <!-- data.json 연동을 통해 동적으로 cuts 로드 및 렌더링 -->
+            </div>
 
-    <!-- End screen overlay -->
-    <div id="end-screen">
-      <div class="end-title">감상이 완료되었습니다.</div>
-      <button class="replay-btn" id="btn-replay">
-        <span class="material-icons-round">replay</span>
-        처음부터 다시 보기
-      </button>
-    </div>
-
-    <!-- Control panel -->
-    <div id="dashboard">
-      <!-- Scrub Bar -->
-      <div class="scrub-container" id="scrub-bar">
-        <div class="scrub-progress" id="scrub-progress"></div>
-        <div class="scrub-handle" id="scrub-handle"></div>
-        <!-- Bubble timing ticks will render here dynamically -->
-        <div id="ticks-container"></div>
-      </div>
-
-      <!-- Controls Row -->
-      <div class="controls-row">
-        <div class="btn-group">
-          <button class="control-btn" id="btn-prev" title="이전 컷">
-            <span class="material-icons-round">skip_previous</span>
-          </button>
-          <button class="control-btn" id="btn-play-pause" title="재생/일시정지">
-            <span class="material-icons-round" id="play-pause-icon">pause</span>
-          </button>
-          <button class="control-btn" id="btn-next" title="다음 컷">
-            <span class="material-icons-round">skip_next</span>
-          </button>
-          <span class="cut-indicator" id="cut-number-display">CUT 1 / 3</span>
         </div>
-
-        <div class="cut-time-display" id="cut-time-display">0.0s / 0.0s</div>
-
-        <div class="volume-container">
-          <span class="material-icons-round" id="volume-icon" style="font-size: 1.2rem;">volume_up</span>
-          <input type="range" class="volume-slider" id="vol-slider" min="0" max="1" step="0.05" value="0.5">
-        </div>
-      </div>
     </div>
 
-  </div>
-
-  <script>
-    // System Data & States
-    let webtoonData = null;
+    <!-- 🎬 공통 뷰어 사운드/연출 핵심 엔진 주입 -->
+    <script src="viewer.js"></script>
     
-    const state = {
-      currentCutIndex: 0,
-      cutElapsed: 0,            // Time in ms elapsed inside the current cut
-      isPlaying: false,          // Controls playback timeline tick
-      isStateLocked: true,       // Controls state lock guard
-      globalVolume: 0.5,
-      playedAudios: new Set()    // Audio IDs triggered in the current cut
-    };
+    <script>
+        // 전역 상태 캐싱 (viewer.js 내부 상태와 일치)
+        var cutsData = window.cutsData = window.cutsData || [];
+        var activeBgms = window.activeBgms = window.activeBgms || {}; 
+        var isWebAudioInitialized = window.isWebAudioInitialized = window.isWebAudioInitialized || false;
 
-    // Engine loop tracking variables
-    let animationFrameId = null;
-    let cutStartTime = 0;        // Timestamp when current cut started (performance.now() adjusted)
-    let pausedElapsed = 0;       // Buffer to keep track of elapsed duration when paused
-    let activeAudios = [];       // Track playing audio instances for teardown
+        var viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
+        var introOverlay = window.introOverlay = document.getElementById('introOverlay');
 
-    // DOM Elements
-    const lockScreen = document.getElementById("lock-screen");
-    const webtoonViewport = document.getElementById("webtoon-viewport");
-    const scrubBar = document.getElementById("scrub-bar");
-    const scrubProgress = document.getElementById("scrub-progress");
-    const scrubHandle = document.getElementById("scrub-handle");
-    const ticksContainer = document.getElementById("ticks-container");
-    const btnPlayPause = document.getElementById("btn-play-pause");
-    const playPauseIcon = document.getElementById("play-pause-icon");
-    const btnPrev = document.getElementById("btn-prev");
-    const btnNext = document.getElementById("btn-next");
-    const btnStart = document.getElementById("btn-start");
-    const btnReplay = document.getElementById("btn-replay");
-    const endScreen = document.getElementById("end-screen");
-    const cutNumberDisplay = document.getElementById("cut-number-display");
-    const cutTimeDisplay = document.getElementById("cut-time-display");
-    const volSlider = document.getElementById("vol-slider");
-    const volumeIcon = document.getElementById("volume-icon");
-    const webtoonTitleLock = document.getElementById("webtoon-title-lock");
-
-    // Initialize application
-    window.addEventListener("DOMContentLoaded", async () => {
-      await loadData();
-      setupEvents();
-    });
-
-    // Load webtoon configurations from localStorage or default webtoon_data.json
-    async function loadData() {
-      try {
-        const localConfig = localStorage.getItem("webtoon_data");
-        if (localConfig) {
-          webtoonData = JSON.parse(localConfig);
-          console.log("Loaded configuration from localStorage");
-        } else {
-          const res = await fetch("./webtoon_data.json");
-          webtoonData = await res.json();
-          console.log("Loaded default configuration from file");
-        }
-      } catch (err) {
-        console.error("Failed to load webtoon configuration:", err);
-        // Fallback dummy database just in case
-        webtoonData = {
-          title: "연결 오류 - 기본 데이터 로드 실패",
-          cuts: [{
-            id: 1,
-            backgroundImage: "",
-            duration: 5000,
-            camera: { startX:0, startY:0, startScale:1, endX:0, endY:0, endScale:1, startTime:0, duration:5000 },
-            audios: [],
-            bubbles: [{ id: "fallback_b", text: "데이터를 로드하는 데 실패하였습니다.", x: 20, y: 40, startTime: 500, charInterval: 100, style: "modern", color: "#f8fafc", backgroundColor: "rgba(220,38,38,0.9)", borderColor: "#ef4444" }]
-          }]
+        // 로컬 파일 시스템 구동 시 CORS 에러 완충용 프리미엄 기본 시네마틱 폴백 데이터
+        const fallbackData = {
+          "bgms": [
+            {
+              "id": "bgm_1",
+              "name": "대항해시대2 Ost - Menu Theme",
+              "audioUrl": "대항해시대2 Ost - Menu Theme(AI).mp3",
+              "startCut": 1,
+              "endCut": 2,
+              "startTime": 0.0
+            },
+            {
+              "id": "bgm_2",
+              "name": "Uncharted Waters - 01 Opening",
+              "audioUrl": "Uncharted Waters - 01 Opening.mp3",
+              "startCut": 3,
+              "endCut": 3,
+              "startTime": 0.0
+            }
+          ],
+          "cuts": [
+            {
+              "id": "cut_0",
+              "index": 1,
+              "bgImageName": "1.jpg",
+              "bgImage": "1.jpg",
+              "effectType": "fade",
+              "items": [
+                {
+                  "id": "item_0",
+                  "type": "dialogue",
+                  "charName": "페레로",
+                  "charColor": "#e0e7ff",
+                  "text": "이곳이 바로... 소문으로만 듣던 신비의 섬인가?",
+                  "audioUrl": "녹음.m4a",
+                  "start": 0.5,
+                  "duration": 3.0,
+                  "x": 15.0,
+                  "y": 20.0,
+                  "baseAngle": 45.0,
+                  "tipDx": 35.0,
+                  "tipDy": 35.0
+                }
+              ]
+            },
+            {
+              "id": "cut_1",
+              "index": 2,
+              "bgImageName": "2.jpg",
+              "bgImage": "2.jpg",
+              "effectType": "shake",
+              "items": [
+                {
+                  "id": "item_1",
+                  "type": "dialogue",
+                  "charName": "알 베자스",
+                  "charColor": "#fee2e2",
+                  "text": "으윽! 갑자기 거대한 해일이 몰려오고 있다! 쾅!!",
+                  "audioUrl": "녹음.m4a",
+                  "start": 0.2,
+                  "duration": 3.5,
+                  "x": 20.0,
+                  "y": 50.0,
+                  "baseAngle": 135.0,
+                  "tipDx": -40.0,
+                  "tipDy": 40.0
+                }
+              ]
+            }
+          ]
         };
-      }
-      
-      // Update splash display
-      if (webtoonData.title) {
-        webtoonTitleLock.textContent = webtoonData.title;
-        document.title = `${webtoonData.title} - 모션 웹툰 뷰어`;
-      }
-    }
 
-    function setupEvents() {
-      // Start button clicks
-      btnStart.addEventListener("click", () => {
-        unlockState();
-      });
+        // 로컬 웹 서버 실행 안내 모달 및 배너 연출
+        function showLocalServerGuide() {
+            if (document.getElementById('localServerGuideBanner')) return;
 
-      // Play & Pause
-      btnPlayPause.addEventListener("click", togglePlay);
+            const banner = document.createElement('div');
+            banner.id = 'localServerGuideBanner';
+            banner.style.position = 'absolute';
+            banner.style.top = '100px'; // BGM 버튼과 겹치지 않게 노치 아래쪽으로 위치 하강
+            banner.style.left = '50%';
+            banner.style.transform = 'translateX(-50%)';
+            banner.style.width = '90%';
+            banner.style.maxWidth = '320px';
+            banner.style.background = 'rgba(15, 23, 42, 0.95)'; // 프리미엄 다크 유리모피즘 배경
+            banner.style.border = '1px solid rgba(99, 102, 241, 0.35)'; // 프리미엄 테두리
+            banner.style.backdropFilter = 'blur(20px)';
+            banner.style.webkitBackdropFilter = 'blur(20px)';
+            banner.style.borderRadius = '1.5rem';
+            banner.style.padding = '1rem';
+            banner.style.zIndex = '500'; // BGM/FAB 버튼보다 위에 표시되도록 레이어 순위 보장
+            banner.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.6)';
+            banner.style.display = 'flex';
+            banner.style.flexDirection = 'column';
+            banner.style.gap = '0.6rem';
+            banner.style.transition = 'all 0.3s ease';
 
-      // Prev & Next Cut
-      btnPrev.addEventListener("click", () => {
-        if (state.currentCutIndex > 0) {
-          changeCut(state.currentCutIndex - 1);
-        }
-      });
-      btnNext.addEventListener("click", () => {
-        if (state.currentCutIndex < webtoonData.cuts.length - 1) {
-          changeCut(state.currentCutIndex + 1);
-        }
-      });
+            banner.innerHTML = `
+                <div style="display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; margin-bottom: 0.2rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; font-weight: 800; color: #a5b4fc;">
+                        <span>ℹ️ 로컬 파일(CORS 제한) 모드</span>
+                    </div>
+                </div>
+                <p style="margin: 0; font-size: 0.72rem; color: #cbd5e1; line-height: 1.5; text-align: left; word-break: keep-all;">
+                    브라우저 CORS 제한으로 기본 폴백 데이터로 구동 중입니다. 직접 편집기에서 저장(내보내기)한 <strong>data.json</strong> 또는 <strong>JSON 파일</strong>을 아래 버튼을 통해 바로 불러와 감상하실 수 있습니다!
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.3rem;">
+                    <input type="file" id="localJsonFileInput" accept=".json" style="display: none;">
+                    <button id="selectLocalJsonBtn" style="background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: #ffffff; border-radius: 8px; padding: 0.5rem; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(99,102,241,0.25); display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+                        📁 직접 내보낸 JSON 파일 불러오기
+                    </button>
+                    <button id="showGuideBtn" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; border-radius: 8px; padding: 0.4rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                        🌐 로컬 웹 서버 구동방법 확인
+                    </button>
+                </div>
+            `;
 
-      // Replay at end screen
-      btnReplay.addEventListener("click", () => {
-        endScreen.classList.remove("visible");
-        changeCut(0);
-        state.isPlaying = true;
-        playPauseIcon.textContent = "pause";
-        startLoop();
-      });
-
-      // Timeline Scrubbing
-      scrubBar.addEventListener("click", (e) => {
-        if (state.isStateLocked || !webtoonData) return;
-        const rect = scrubBar.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const width = rect.width;
-        let progress = clickX / width;
-        progress = Math.min(1, Math.max(0, progress));
-        
-        scrubToProgress(progress);
-      });
-
-      // Volume slider change
-      volSlider.addEventListener("input", (e) => {
-        state.globalVolume = parseFloat(e.target.value);
-        updateVolume();
-      });
-    }
-
-    // Unlocks State lock: Allows audio and ticking to execute
-    function unlockState() {
-      state.isStateLocked = false;
-      lockScreen.classList.add("unlocked");
-      
-      // Explicitly resume Audio Context to satisfy browser policies
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        const dummyCtx = new AudioCtx();
-        dummyCtx.resume();
-      }
-
-      state.isPlaying = true;
-      playPauseIcon.textContent = "pause";
-      
-      // Load and start first cut
-      changeCut(0);
-      startLoop();
-    }
-
-    function togglePlay() {
-      if (state.isStateLocked) return;
-      
-      state.isPlaying = !state.isPlaying;
-      if (state.isPlaying) {
-        playPauseIcon.textContent = "pause";
-        // Calculate new start time based on previously accumulated elapsed duration
-        cutStartTime = performance.now() - pausedElapsed;
-        resumeAudios();
-        animationFrameId = requestAnimationFrame(tick);
-      } else {
-        playPauseIcon.textContent = "play_arrow";
-        // Buffer current elapsed progress
-        pausedElapsed = state.cutElapsed;
-        pauseAudios();
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      }
-    }
-
-    function startLoop() {
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      cutStartTime = performance.now() - pausedElapsed;
-      animationFrameId = requestAnimationFrame(tick);
-    }
-
-    // Unified requestAnimationFrame loop
-    function tick(timestamp) {
-      if (!state.isPlaying || state.isStateLocked) return;
-
-      state.cutElapsed = timestamp - cutStartTime;
-      const currentCut = webtoonData.cuts[state.currentCutIndex];
-
-      // Check if cut has ended
-      if (state.cutElapsed >= currentCut.duration) {
-        if (state.currentCutIndex < webtoonData.cuts.length - 1) {
-          changeCut(state.currentCutIndex + 1);
-        } else {
-          // Finished webtoon
-          state.isPlaying = false;
-          pauseAudios();
-          endScreen.classList.add("visible");
-          if (animationFrameId) cancelAnimationFrame(animationFrameId);
-          return;
-        }
-      } else {
-        // Run update timeline for this frames' elapsed tick
-        updateFrame(currentCut, state.cutElapsed);
-      }
-
-      animationFrameId = requestAnimationFrame(tick);
-    }
-
-    // Data-binding: Update view solely based on timeline elapsed count
-    function updateFrame(cut, elapsed) {
-      // 1. Render camera movement
-      const camera = cut.camera;
-      if (camera && elapsed >= camera.startTime) {
-        const camElapsed = elapsed - camera.startTime;
-        const progress = Math.min(1, Math.max(0, camElapsed / camera.duration));
-        
-        // Linear interpolation formula
-        const currentX = camera.startX + (camera.endX - camera.startX) * progress;
-        const currentY = camera.startY + (camera.endY - camera.startY) * progress;
-        const currentScale = camera.startScale + (camera.endScale - camera.startScale) * progress;
-
-        const bgImg = document.getElementById("cut-background");
-        if (bgImg) {
-          bgImg.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) scale(${currentScale})`;
-        }
-      }
-
-      // 2. Render speech bubbles & typing animation state
-      cut.bubbles.forEach(bubble => {
-        const wrapper = document.getElementById(bubble.id);
-        if (!wrapper) return;
-
-        if (elapsed >= bubble.startTime) {
-          // Add entrance pop class (CSS keyframe trigger)
-          if (!wrapper.classList.contains("active")) {
-            wrapper.classList.add("active");
-          }
-
-          // Calculate characters to reveal (JS Direct typing control)
-          const textElapsed = elapsed - bubble.startTime;
-          const charsToReveal = Math.floor(textElapsed / bubble.charInterval);
-
-          const textLayer = wrapper.querySelector(".bubble-text-layer");
-          if (textLayer) {
-            const spans = textLayer.children;
-            for (let i = 0; i < spans.length; i++) {
-              if (i < charsToReveal) {
-                spans[i].style.opacity = "1";
-              } else {
-                spans[i].style.opacity = "0";
-              }
+            const mobileFrame = document.getElementById('mobileFrame');
+            if (mobileFrame) {
+                mobileFrame.appendChild(banner);
             }
-          }
-        } else {
-          // If timeline was scrubbed backward, hide bubbles
-          wrapper.classList.remove("active");
-          const textLayer = wrapper.querySelector(".bubble-text-layer");
-          if (textLayer) {
-            const spans = textLayer.children;
-            for (let i = 0; i < spans.length; i++) {
-              spans[i].style.opacity = "0";
+
+            const selectBtn = document.getElementById('selectLocalJsonBtn');
+            const fileInput = document.getElementById('localJsonFileInput');
+            if (selectBtn && fileInput) {
+                selectBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    fileInput.click();
+                });
+
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(evt) {
+                            try {
+                                const data = JSON.parse(evt.target.result);
+                                initializeViewer(data);
+                                banner.style.opacity = '0';
+                                banner.style.transform = 'translateX(-50%) translateY(-10px)';
+                                setTimeout(() => banner.remove(), 300);
+                            } catch (err) {
+                                alert("유효하지 않은 JSON 파일 형식입니다: " + err.message);
+                            }
+                        };
+                        reader.readAsText(file);
+                    }
+                });
             }
-          }
+
+            document.getElementById('showGuideBtn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                showServerModal();
+            });
         }
-      });
 
-      // 3. Audio Triggers
-      cut.audios.forEach(audioData => {
-        if (elapsed >= audioData.startTime && !state.playedAudios.has(audioData.id)) {
-          state.playedAudios.add(audioData.id);
-          const startOffset = (elapsed - audioData.startTime) / 1000;
-          playAudioInstance(audioData, startOffset);
+        function showServerModal() {
+            const modal = document.createElement('div');
+            modal.style.position = 'absolute';
+            modal.style.top = '0'; modal.style.left = '0'; modal.style.right = '0'; modal.style.bottom = '0';
+            modal.style.background = 'rgba(15, 23, 42, 0.94)';
+            modal.style.backdropFilter = 'blur(16px)';
+            modal.style.webkitBackdropFilter = 'blur(16px)';
+            modal.style.zIndex = '600';
+            modal.style.display = 'flex';
+            modal.style.justifyContent = 'center';
+            modal.style.alignItems = 'center';
+            modal.style.padding = '1.5rem';
+            modal.style.color = '#f8fafc';
+            modal.style.opacity = '0';
+            modal.style.transition = 'opacity 0.3s ease';
+
+            modal.innerHTML = `
+                <div style="background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); padding: 1.8rem 1.4rem; border-radius: 2rem; width: 100%; max-width: 290px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: left;">
+                    <div style="font-size: 1.6rem; margin-bottom: 0.5rem;">🚀</div>
+                    <h3 style="margin: 0 0 0.6rem 0; font-size: 1.1rem; font-weight: 800; font-family: 'Outfit', sans-serif;">로컬 서버 실행 가이드</h3>
+                    <p style="margin: 0 0 1rem 0; font-size: 0.76rem; color: #94a3b8; line-height: 1.5; word-break: keep-all;">
+                        브라우저 보안(CORS) 정책에 따라, 파일 경로(<code>file://</code>)로 직접 접근 시 비동기 <code>fetch</code>가 차단됩니다. 아래 중 편한 방법으로 가상 서버를 기동해 감상해 주십시오.
+                    </p>
+                    
+                    <div style="background: rgba(15, 23, 42, 0.6); border-radius: 0.85rem; padding: 0.85rem; font-size: 0.7rem; font-family: monospace; color: #38bdf8; margin-bottom: 1.2rem; border: 1px solid rgba(255,255,255,0.05); line-height: 1.5; word-break: break-all;">
+                        <strong style="color: #fff;">💡 방법 1: VS Code 확장 기능</strong><br>
+                        1. VS Code에서 폴더 열기<br>
+                        2. <code>Live Server</code> 확장 설치<br>
+                        3. 하단 상태 표시줄 <code>Go Live</code> 클릭<br><br>
+                        <strong style="color: #fff;">💡 방법 2: Node.js 터미널</strong><br>
+                        <code>npx serve</code><br><br>
+                        <strong style="color: #fff;">💡 방법 3: Python 터미널</strong><br>
+                        <code>python -m http.server 8000</code>
+                    </div>
+
+                    <button id="closeServerModal" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; padding: 0.8rem; border-radius: 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer; width: 100%; box-shadow: 0 6px 20px rgba(99,102,241,0.3); transition: all 0.2s;">
+                        돌아가기
+                    </button>
+                </div>
+            `;
+
+            const mobileFrame = document.getElementById('mobileFrame');
+            if (mobileFrame) {
+                mobileFrame.appendChild(modal);
+                void modal.offsetWidth;
+                modal.style.opacity = '1';
+            }
+
+            document.getElementById('closeServerModal').addEventListener('click', () => {
+                modal.style.opacity = '0';
+                setTimeout(() => modal.remove(), 300);
+            });
         }
-      });
 
-      // 4. Update Dashboard displays
-      const progressPercent = Math.min(100, Math.max(0, (elapsed / cut.duration) * 100));
-      scrubProgress.style.width = `${progressPercent}%`;
-      scrubHandle.style.left = `${progressPercent}%`;
-      
-      const currentSec = (elapsed / 1000).toFixed(1);
-      const totalSec = (cut.duration / 1000).toFixed(1);
-      cutTimeDisplay.textContent = `${currentSec}s / ${totalSec}s`;
-    }
+        // 수려한 프리미엄 스키마 버전 매칭 토스트 알림창
+        function showVersionNotification(version) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: absolute;
+                top: 55px;
+                left: 50%;
+                transform: translateX(-50%) translateY(-20px);
+                background: rgba(15, 23, 42, 0.9);
+                border: 1px solid ${version === "2.0" ? "rgba(99, 102, 241, 0.4)" : "rgba(245, 158, 11, 0.4)"};
+                color: #ffffff;
+                padding: 0.6rem 1.2rem;
+                border-radius: 1rem;
+                font-size: 0.75rem;
+                font-weight: 800;
+                z-index: 9999;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                opacity: 0;
+                transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            `;
+            
+            const dot = document.createElement('div');
+            dot.style.cssText = `
+                width: 7px;
+                height: 7px;
+                background-color: ${version === "2.0" ? "#6366f1" : "#f59e0b"};
+                border-radius: 50%;
+                box-shadow: 0 0 8px ${version === "2.0" ? "#6366f1" : "#f59e0b"};
+            `;
+            
+            const text = document.createElement('span');
+            text.textContent = version === "2.0" 
+                ? `Director V2.0 작품 로드 완료` 
+                : `Legacy V1.0 작품 호환 로드 완료`;
+                
+            toast.appendChild(dot);
+            toast.appendChild(text);
+            
+            const mobileFrame = document.getElementById('mobileFrame');
+            if (mobileFrame) {
+                mobileFrame.appendChild(toast);
+                requestAnimationFrame(() => {
+                    toast.style.opacity = '1';
+                    toast.style.transform = 'translateX(-50%) translateY(0)';
+                });
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(-50%) translateY(-10px)';
+                    setTimeout(() => toast.remove(), 400);
+                }, 2500);
+            }
+        }
 
-    // Play an audio element and sync start offsets
-    function playAudioInstance(audioData, startOffset = 0) {
-      const audio = new Audio(audioData.src);
-      audio.loop = audioData.loop || false;
-      audio.volume = (audioData.volume !== undefined ? audioData.volume : 0.8) * state.globalVolume;
-      
-      // Store in tracking array for cleanup
-      const audioObj = { id: audioData.id, element: audio, startTime: audioData.startTime };
-      activeAudios.push(audioObj);
-
-      // Play audio sync
-      if (startOffset > 0 && !audioData.loop) {
-        audio.currentTime = startOffset;
-      }
-      
-      audio.play().catch(err => {
-        console.warn(`Audio play blocked or missing files for: ${audioData.src}. It will play once browser is interacting.`, err);
-      });
-    }
-
-    // Audio volume updates
-    function updateVolume() {
-      activeAudios.forEach(audioObj => {
-        // Find configuration to map base volume
-        const currentCut = webtoonData.cuts[state.currentCutIndex];
-        const audioConf = currentCut.audios.find(a => a.id === audioObj.id);
-        const baseVolume = audioConf ? (audioConf.volume !== undefined ? audioConf.volume : 0.8) : 0.8;
+        // 배경음악 음소거 상태 제어 변수
+        window.isBgmVolumeMuted = false;
         
-        audioObj.element.volume = baseVolume * state.globalVolume;
-      });
+        const bgmToggleBtn = document.getElementById('bgmToggleBtn');
+        if (bgmToggleBtn) {
+            bgmToggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 상위 스크롤 락 및 터치 간섭 완전 차단
+                window.isBgmVolumeMuted = !window.isBgmVolumeMuted;
+                
+                bgmToggleBtn.classList.toggle('muted', window.isBgmVolumeMuted);
+                bgmToggleBtn.innerHTML = window.isBgmVolumeMuted ? "🔇" : "🎵";
+                
+                // 오디오 콘텍스트의 gainNode를 감쇄/복구 (Web Audio API 대응)
+                if (window.audioPipeManager) {
+                    window.audioPipeManager.init();
+                    if (window.audioPipeManager.bgmMasterGain && window.audioPipeManager.ctx) {
+                        const now = window.audioPipeManager.ctx.currentTime;
+                        const targetGain = window.isBgmVolumeMuted ? 0.0 : 1.0;
+                        window.audioPipeManager.bgmMasterGain.gain.setTargetAtTime(targetGain, now, 0.1);
+                    }
+                }
+                
+                // BGM 60fps 더킹 감쇄를 즉각 강제하기 위해 viewer.js의 BGM 루프 상태에도 volume을 즉시 0/lerp 조율
+                if (window.activeBgms) {
+                    Object.values(window.activeBgms).forEach(track => {
+                        if (track.audio) {
+                            if (window.isBgmVolumeMuted) {
+                                track.audio.volume = 0;
+                            } else {
+                                track.audio.volume = 0.25;
+                            }
+                        }
+                    });
+                }
+                
+                console.log(`[BGM Mute Mode Toggle] Muted: ${window.isBgmVolumeMuted}`);
+            });
+        }
 
-      if (state.globalVolume === 0) {
-        volumeIcon.textContent = "volume_off";
-      } else if (state.globalVolume < 0.4) {
-        volumeIcon.textContent = "volume_down";
-      } else {
-        volumeIcon.textContent = "volume_up";
-      }
-    }
+        // 고해상도 말풍선 둥근 SVG 및 꼬리표 물리 기하 실시간 관찰 엔진 (ResizeObserver)
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const bubble = entry.target.closest('.speech-bubble');
+                if (bubble) {
+                    const baseAngle = parseFloat(bubble.dataset.baseAngle) || 45;
+                    const tipDx = parseFloat(bubble.dataset.tipDx) || 30;
+                    const tipDy = parseFloat(bubble.dataset.tipDy) || 30;
+                    const baseWidth = parseFloat(bubble.dataset.baseWidth) || 14;
+                    updateTailRuntime(bubble, baseAngle, tipDx, tipDy, baseWidth);
+                }
+            }
+        });
+        window.resizeObserver = resizeObserver;
 
-    function pauseAudios() {
-      activeAudios.forEach(audio => audio.element.pause());
-    }
+        // 전체 초기화 래퍼 함수
+        // 뷰어 전용 selectCut 함수 정의
+        function selectCut(cutId, smoothScroll = true) {
+            try {
+                const targetItem = document.getElementById(`viewerCut_${cutId}`);
+                if (targetItem) {
+                    if (smoothScroll && typeof animateScrollTo === 'function') {
+                        animateScrollTo(targetItem.offsetTop, 600, () => {
+                            window.lastSettledCutId = cutId;
+                            window.currentCutId = cutId;
+                            if (typeof window.handleScrollUpdate === 'function') {
+                                window.handleScrollUpdate();
+                            }
+                        });
+                    } else {
+                        viewerScrollContainer.scrollTop = targetItem.offsetTop;
+                        window.lastSettledCutId = cutId;
+                        window.currentCutId = cutId;
+                        if (typeof window.handleScrollUpdate === 'function') {
+                            window.handleScrollUpdate();
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("[Viewer selectCut Error]", err);
+            }
+        }
+        window.selectCut = selectCut;
 
-    function resumeAudios() {
-      activeAudios.forEach(audio => {
-        audio.element.play().catch(e => console.warn(e));
-      });
-    }
+        // 전체 초기화 래퍼 함수 (동기 DOM 빌드)
+        function initializeViewer(data) {
+            const version = data.version || "1.0";
+            console.log(`[Schema Version Check] Project Version: ${version}`);
+            
+            // 0. 스키마 버전 알림 가동
+            showVersionNotification(version);
 
-    // Physical Teardown / Cleanup Lifecycle
-    function cleanupCurrentCut() {
-      // 1. Physically pause and release Audio Elements
-      activeAudios.forEach(audioObj => {
-        audioObj.element.pause();
-        audioObj.element.src = "";
-        audioObj.element.load();
-        audioObj.element = null;
-      });
-      activeAudios = [];
-      state.playedAudios.clear();
+            cutsData = data.cuts || [];
+            
+            // 프리미엄 데이터 동기화: 기존 window.cuts 배열의 참조를 완벽히 유지하여 viewer.js 렉시컬 스코프 참조 락 방지
+            if (window.cuts && Array.isArray(window.cuts)) {
+                window.cuts.splice(0, window.cuts.length, ...cutsData);
+            } else {
+                window.cuts = cutsData;
+            }
+            
+            window.bgmsDataListGlobal = data.bgms || []; // 글로벌 BGM 데이터 캐시 동시 바인딩
+            
+            // 1. DOM 빌드
+            buildViewerDOM(data);
+            
+            // 2. 초기 1컷 바인딩 및 말꼬리 초기 드로잉 트리거
+            if (cutsData.length > 0) {
+                window.currentCutId = cutsData[0].id;
+                window.lastSettledCutId = null; // 오토플레이 안착 판정을 위해 최초에는 null로 비워둡니다.
+                
+                setTimeout(() => {
+                    cutsData.forEach(c => {
+                        if (c.items) {
+                            c.items.forEach(item => {
+                                if (item.type === 'dialogue') {
+                                    const bubble = document.getElementById(`bubble_${item.id}`);
+                                    if (bubble) {
+                                        updateTailRuntime(bubble, item.baseAngle, item.tipDx, item.tipDy, item.baseWidth);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }, 100);
+            }
+        }
 
-      // 2. Clear out all nodes & bindings in viewport to prevent leaks
-      if (webtoonViewport) {
-        // replaceChildren is extremely clean and destroys references
-        webtoonViewport.replaceChildren();
-      }
-    }
+        // 비동기 프로젝트 로더 및 샌드박스 초기 안착 기동 함수
+        async function initViewerFromData(dataPath = 'data.json') {
+            try {
+                console.log(`[initViewerFromData] Async loading: ${dataPath}`);
+                const res = await fetch(`${dataPath}?t=${Date.now()}`);
+                if (!res.ok) throw new Error("data.json 로드 실패");
+                
+                const rawData = await res.json();
+                
+                // 데이터 어댑터 가동: 프로퍼티 스키마 매핑 및 리소스 상대 경로 일괄 정규화 완료
+                const normalizedData = window.normalizeAndMapProjectData(rawData);
+                
+                // DOM 빌딩
+                initializeViewer(normalizedData);
+                
+                // 기동 샌드박스: 로드 직후 0.05초 이내 첫 번째 컷을 강제 selectCut 안착 및 첫 컷 연출 즉시 가동
+                if (cutsData.length > 0) {
+                    setTimeout(() => {
+                        window.lastSettledCutId = null; // lastSettledCutId를 명시적으로 비워서 안착 판단 유도
+                        selectCut(cutsData[0].id, false);
+                        if (typeof window.triggerAutoplayForCurrentCut === 'function') {
+                            window.triggerAutoplayForCurrentCut();
+                        }
+                    }, 50);
+                }
+                
+            } catch (err) {
+                console.warn("로컬 환경 파일 시스템(CORS 제한) 우회: 폴백 데이터로 기동합니다.", err);
+                showLocalServerGuide();
+                
+                // 폴백 데이터 매핑 및 정규화
+                const normalizedFallback = window.normalizeAndMapProjectData(fallbackData);
+                initializeViewer(normalizedFallback);
+                
+                if (cutsData.length > 0) {
+                    setTimeout(() => {
+                        window.lastSettledCutId = null;
+                        selectCut(cutsData[0].id, false);
+                        if (typeof window.triggerAutoplayForCurrentCut === 'function') {
+                            window.triggerAutoplayForCurrentCut();
+                        }
+                    }, 50);
+                }
+            }
+        }
 
-    // Renders the static structural shells for a new cut
-    function renderCutFramework(cut) {
-      // 1. Render Background Image Container
-      const bgContainer = document.createElement("div");
-      bgContainer.className = "bg-container";
-
-      const bgImg = document.createElement("img");
-      bgImg.id = "cut-background";
-      bgImg.src = cut.backgroundImage;
-      bgImg.alt = `Cut ${cut.id} Background`;
-      
-      // Set initial camera frame
-      const cam = cut.camera;
-      if (cam) {
-        bgImg.style.transform = `translate3d(${cam.startX}px, ${cam.startY}px, 0) scale(${cam.startScale})`;
-      }
-
-      bgContainer.appendChild(bgImg);
-      webtoonViewport.appendChild(bgContainer);
-
-      // 2. Render Bubble Wrapper Structures
-      const bubbleOverlay = document.createElement("div");
-      bubbleOverlay.className = "bubble-overlay";
-
-      cut.bubbles.forEach(bubble => {
-        const wrapper = document.createElement("div");
-        wrapper.id = bubble.id;
-        wrapper.className = `bubble-wrapper bubble-style-${bubble.style}`;
-        wrapper.style.left = `${bubble.x}%`;
-        wrapper.style.top = `${bubble.y}%`;
-
-        // Create Background Style layer
-        const bgLayer = document.createElement("div");
-        bgLayer.className = "bubble-bg-layer";
-        bgLayer.textContent = bubble.text; // Keeps exact bounding size calculations
-        
-        // Dynamically apply design styling
-        bgLayer.style.color = bubble.color || "#000";
-        bgLayer.style.backgroundColor = bubble.backgroundColor || "#fff";
-        bgLayer.style.borderColor = bubble.borderColor || "#000";
-
-        // Create JS Typing layer (separate DOM layer)
-        const textLayer = document.createElement("div");
-        textLayer.className = "bubble-text-layer";
-        textLayer.style.color = bubble.color || "#000";
-
-        // Separate text elements to control with JS Loop
-        const characters = Array.from(bubble.text);
-        characters.forEach(char => {
-          const span = document.createElement("span");
-          span.textContent = char;
-          textLayer.appendChild(span);
+        // [동적 바인딩] DOMContentLoaded 시점에 비동기 Loader 호출
+        window.addEventListener('DOMContentLoaded', async () => {
+            await initViewerFromData('data.json');
         });
 
-        wrapper.appendChild(bgLayer);
-        wrapper.appendChild(textLayer);
-        bubbleOverlay.appendChild(wrapper);
-      });
+        // viewer DOM 동적 빌더
+        function buildViewerDOM(data) {
+            viewerScrollContainer.innerHTML = '';
+            
+            data.cuts.forEach(c => {
+                const cutItem = document.createElement('div');
+                cutItem.className = 'viewer-cut-item';
+                cutItem.id = `viewerCut_${c.id}`;
+                cutItem.dataset.cutId = c.id;
 
-      webtoonViewport.appendChild(bubbleOverlay);
+                // [신규] 3중 레이어 렌더링 연산부 (구버전 bgImage 동시 호환)
+                function buildLayer(layerIndex, layerObj) {
+                    if (!layerObj || !layerObj.url) return null;
 
-      // 3. Render Timeline Ticks for Speech Bubbles
-      ticksContainer.replaceChildren();
-      cut.bubbles.forEach(bubble => {
-        const pct = (bubble.startTime / cut.duration) * 100;
-        const tick = document.createElement("div");
-        tick.className = "bubble-tick";
-        tick.style.left = `${pct}%`;
-        tick.title = `말풍선 노출 시작: ${(bubble.startTime / 1000).toFixed(1)}s`;
-        ticksContainer.appendChild(tick);
-      });
-    }
+                    let el;
+                    if (layerObj.type === 'video') {
+                        el = document.createElement('video');
+                        el.src = normalizeMediaPath(layerObj.url);
+                        el.autoplay = true;
+                        el.loop = true;
+                        el.muted = true;
+                        el.playsinline = true;
+                        el.setAttribute('autoplay', '');
+                        el.setAttribute('loop', '');
+                        el.setAttribute('muted', '');
+                        el.setAttribute('playsinline', '');
+                    } else {
+                        el = document.createElement('div');
+                        el.style.backgroundImage = `url(${normalizeMediaPath(layerObj.url)})`;
+                    }
 
-    // Handles cut transition
-    function changeCut(index) {
-      cleanupCurrentCut();
+                    el.className = 'cut-layer';
+                    el.dataset.layer = layerIndex;
 
-      state.currentCutIndex = index;
-      pausedElapsed = 0;
-      state.cutElapsed = 0;
-      
-      const currentCut = webtoonData.cuts[state.currentCutIndex];
-      renderCutFramework(currentCut);
+                    // Stacking order: layer 3(background - z-index: 1), layer 2(prop - z-index: 2), layer 1(char - z-index: 3)
+                    if (layerIndex === 3) el.style.zIndex = '1';
+                    else if (layerIndex === 2) el.style.zIndex = '2';
+                    else if (layerIndex === 1) el.style.zIndex = '3';
 
-      // Update control bar displays
-      cutNumberDisplay.textContent = `CUT ${index + 1} / ${webtoonData.cuts.length}`;
-      
-      // Adjust skip buttons state
-      btnPrev.disabled = index === 0;
-      btnNext.disabled = index === webtoonData.cuts.length - 1;
-      
-      // Restart loop
-      cutStartTime = performance.now();
-    }
+                    // 연출 효과 타입 적용
+                    if (c.effectType && c.effectType !== 'none' && c.effectType !== 'shake') {
+                        el.classList.add(`effect-${c.effectType}`);
+                    }
 
-    // Timeline scrubbing logic
-    function scrubToProgress(progress) {
-      const currentCut = webtoonData.cuts[state.currentCutIndex];
-      const targetElapsed = currentCut.duration * progress;
+                    return el;
+                }
 
-      // Adjust timelines
-      pausedElapsed = targetElapsed;
-      state.cutElapsed = targetElapsed;
-      cutStartTime = performance.now() - targetElapsed;
+                const l3 = buildLayer(3, c.layer3 || (c.bgImage ? { url: c.bgImage, name: c.bgImageName || '배경', type: 'image' } : null));
+                const l2 = buildLayer(2, c.layer2);
+                const l1 = buildLayer(1, c.layer1);
 
-      // Teardown active playing audios to re-sync
-      activeAudios.forEach(audioObj => {
-        audioObj.element.pause();
-        audioObj.element = null;
-      });
-      activeAudios = [];
-      state.playedAudios.clear();
+                if (l3) cutItem.appendChild(l3);
+                if (l2) cutItem.appendChild(l2);
+                if (l1) cutItem.appendChild(l1);
 
-      // Play audios that should be playing at this elapsed mark
-      currentCut.audios.forEach(audioData => {
-        if (targetElapsed >= audioData.startTime) {
-          state.playedAudios.add(audioData.id);
-          const elapsedInAudio = (targetElapsed - audioData.startTime) / 1000;
-          
-          if (audioData.loop) {
-            // Loop audios play from the wrapped offset
-            const dummyAudio = new Audio(audioData.src);
-            dummyAudio.addEventListener("loadedmetadata", () => {
-              const loopOffset = elapsedInAudio % dummyAudio.duration;
-              playAudioInstance(audioData, loopOffset);
+                if (c.effectType === 'shake') {
+                    cutItem.classList.add('effect-shake');
+                }
+
+                // 말풍선 담을 버블 컨테이너
+                const bubbleContainer = document.createElement('div');
+                bubbleContainer.className = 'bubble-container';
+                bubbleContainer.id = `bubbleContainer_${c.id}`;
+                
+                // 씬 아이템들 순회하여 dialogue 말풍선 렌더링
+                if (c.items) {
+                    c.items.forEach(item => {
+                        if (item.type === 'dialogue') {
+                            const bubble = document.createElement('div');
+                            bubble.className = 'speech-bubble show';
+                            bubble.id = `bubble_${item.id}`;
+                            bubble.dataset.cardId = item.id;
+                            
+                            // 실시간 말꼬리 렌더링에 필요한 물리 속성들을 데이터셋으로 바인딩
+                            bubble.dataset.baseAngle = item.baseAngle || 45;
+                            bubble.dataset.tipDx = item.tipDx || 30;
+                            bubble.dataset.tipDy = item.tipDy || 30;
+                            bubble.dataset.baseWidth = item.baseWidth || 14;
+
+                            bubble.style.left = `${item.x}%`;
+                            bubble.style.top = `${item.y}%`;
+                            bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
+                            bubble.style.setProperty('--text-color', getContrastYIQ(item.charColor));
+
+                            bubble.innerHTML = `
+                                <div class="bubble-shadow-layer"></div>
+                                <div class="bubble-bg-cover"></div>
+                                <svg class="tail-svg" viewBox="0 0 1000 1000" width="1000" height="1000" style="opacity: 1;">
+                                    <path class="bubble-path bubble-path-fill" d="" style="fill: var(--bubble-color); stroke: none; opacity: 1;" />
+                                    <path class="bubble-path bubble-path-stroke" d="" style="fill: none; stroke: #111827; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; opacity: 1;" />
+                                </svg>
+                                <div class="bubble-text-layer">${item.text}</div>
+                            `;
+                            
+                            // 실시간 말풍선 크기 변화 감지하여 말꼬리 재계산 처리
+                            resizeObserver.observe(bubble);
+                            
+                            bubbleContainer.appendChild(bubble);
+                        }
+                    });
+                }
+                
+                cutItem.appendChild(bubbleContainer);
+                viewerScrollContainer.appendChild(cutItem);
             });
-          } else {
-            // Sound effects play if target time is still within audio length range
-            playAudioInstance(audioData, elapsedInAudio);
-          }
         }
-      });
 
-      // Synchronize frame content instantly
-      updateFrame(currentCut, targetElapsed);
+        // 명암 대비 색상 계산기 (Contrast YIQ)
+        function getContrastYIQ(hexcolor){
+            if(!hexcolor) return '#111827';
+            hexcolor = hexcolor.replace("#", "");
+            var r = parseInt(hexcolor.substr(0,2),16);
+            var g = parseInt(hexcolor.substr(2,2),16);
+            var b = parseInt(hexcolor.substr(4,2),16);
+            var yiq = ((r*299)+(g*587)+(b*114))/1000;
+            return (yiq >= 128) ? '#111827' : '#ffffff'; 
+        }
 
-      // Resume BGM/SFX sounds if system is playing
-      if (!state.isPlaying) {
-        pauseAudios();
-      }
-    }
-  </script>
+        // [수학적 말꼬리 SVG 그리기] 둥근 사각형 경계면 교점 기반 법선 벡터
+        function updateTailRuntime(bubble, baseAngle, tipDx, tipDy, baseWidth) {
+            if (!bubble) return;
+            const pathFill = bubble.querySelector('.bubble-path-fill');
+            const pathStroke = bubble.querySelector('.bubble-path-stroke');
+            if (!pathFill || !pathStroke) return;
+
+            const bw = bubble.offsetWidth;
+            const bh = bubble.offsetHeight;
+            const cx = 500 + bw / 2;
+            const cy = 500 + bh / 2;
+            
+            const rad = (baseAngle || 45) * Math.PI / 180;
+            const dx = Math.cos(rad);
+            const dy = Math.sin(rad);
+            
+            const tx = cx + (tipDx || 30);
+            const ty = cy + (tipDy || 30);
+            
+            const halfW = bw / 2;
+            const halfH = bh / 2;
+
+            // [1] 말풍선 둥근 모서리(border-radius) 동적 파싱
+            const computedStyle = window.getComputedStyle(bubble);
+            const borderRadius = parseFloat(computedStyle.borderRadius) || 20;
+            const R = Math.min(borderRadius, halfW, halfH); // 버그 예방용 클램프
+
+            // 가상 직사각형 교점
+            const tv = halfW / Math.max(0.0001, Math.abs(dx));
+            const th = halfH / Math.max(0.0001, Math.abs(dy));
+            const tRect = Math.min(tv, th);
+            const rx = tRect * dx;
+            const ry = tRect * dy;
+
+            let bx_norm, by_norm;
+            const borderX = halfW - R;
+            const borderY = halfH - R;
+
+            // [2] 둥근 모서리 원호 방정식을 활용한 초정밀 접점 기하 연산
+            if (rx > borderX && ry < -borderY) {
+                // 우상 모서리 원호
+                const cxCorner = borderX;
+                const cyCorner = -borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx > borderX && ry > borderY) {
+                // 우하 모서리 원호
+                const cxCorner = borderX;
+                const cyCorner = borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx < -borderX && ry < -borderY) {
+                // 좌상 모서리 원호
+                const cxCorner = -borderX;
+                const cyCorner = -borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx < -borderX && ry > borderY) {
+                // 좌하 모서리 원호
+                const cxCorner = -borderX;
+                const cyCorner = borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else {
+                // 가로/세로 평평한 경계면
+                bx_norm = rx;
+                by_norm = ry;
+            }
+
+            const finalWidth = (baseWidth !== undefined && baseWidth !== null) ? parseFloat(baseWidth) : 14; 
+            
+            // [4] 경계면 정합에 따른 base 오프셋 px, py 계산
+            let px, py;
+            if (tv < th) {
+                // 세로 경계선 교점 -> 세로 방향으로만 오프셋
+                px = 0;
+                py = Math.sign(dx || 1) * (finalWidth / 2);
+            } else if (th < tv) {
+                // 가로 경계선 교점 -> 가로 방향으로만 오프셋
+                px = -Math.sign(dy || 1) * (finalWidth / 2);
+                py = 0;
+            } else {
+                // 모서리 원호 교점 -> 법선 방향 오프셋
+                px = -dy * (finalWidth / 2);
+                py = dx * (finalWidth / 2);
+            }
+
+            let bx_stroke = cx + bx_norm;
+            let by_stroke = cy + by_norm;
+            const bx1_stroke = bx_stroke + px;
+            const by1_stroke = by_stroke + py;
+            const bx2_stroke = bx_stroke - px;
+            const by2_stroke = by_stroke - py;
+            const cpx_stroke = bx_stroke + (tx - bx_stroke) * 0.35;
+            const cpy_stroke = by_stroke + (ty - by_stroke) * 0.35;
+
+            // [3] 테두리용(Stroke) 패스: 0px 침투 (완벽히 모서리 경계에서 시작), fill: none
+            const d_stroke = `M ${bx1_stroke} ${by1_stroke} Q ${cpx_stroke} ${cpy_stroke} ${tx} ${ty} Q ${cpx_stroke} ${cpy_stroke} ${bx2_stroke} ${by2_stroke}`;
+            pathStroke.setAttribute('d', d_stroke);
+
+            // [3] 채우기용(Fill) 패스: Stroke와 100% 동일한 곡선을 사용하되, 안쪽으로 8px 확장 영역을 덧붙임
+            const bx1_in = bx1_stroke - dx * 8;
+            const by1_in = by1_stroke - dy * 8;
+            const bx2_in = bx2_stroke - dx * 8;
+            const by2_in = by2_stroke - dy * 8;
+            const d_fill = `M ${bx1_stroke} ${by1_stroke} Q ${cpx_stroke} ${cpy_stroke} ${tx} ${ty} Q ${cpx_stroke} ${cpy_stroke} ${bx2_stroke} ${by2_stroke} L ${bx2_in} ${by2_in} L ${bx1_in} ${by1_in} Z`;
+            pathFill.setAttribute('d', d_fill);
+
+            // [6] 말꼬리 가림막 레이어(.bubble-bg-cover) 실시간 배경색 싱크 보강
+            const bgCover = bubble.querySelector('.bubble-bg-cover');
+            if (bgCover) {
+                bgCover.style.backgroundColor = bubble.style.getPropertyValue('--bubble-color') || '#ffffff';
+            }
+        }
+
+        // [글로벌 BGM 런타임 최적화 동기화 제어 함수]
+        function syncGlobalBgmsRuntime(cutIndex) {
+            if (!isWebAudioInitialized) return;
+
+            // data.json 의 글로벌 bgms 설정을 파싱하여 로드
+            if (Object.keys(activeBgms).length === 0 && window.cutsData) {
+                // 최초 1회 activeBgms 맵 동적 초기화
+                const bgmDataList = window.cutsDataListBgms || []; 
+                // data.json 에 들어있는 bgms 배열을 직접 로드할 수 있도록 전역 대입
+            }
+
+            const bgmsArray = window.bgmsDataListGlobal || [];
+            
+            bgmsArray.forEach(b => {
+                const cardId = b.id;
+                const inRange = cutIndex >= b.startCut && cutIndex <= b.endCut;
+
+                if (!activeBgms[cardId]) {
+                    const audio = new Audio(normalizeMediaPath(b.audioUrl));
+                    audio.loop = true;
+                    
+                    // 루프백 명시적 Fail-safe 복귀
+                    audio.addEventListener('ended', () => {
+                        if (audio.loop && activeBgms[cardId] && activeBgms[cardId].isPlaying) {
+                            audio.currentTime = activeBgms[cardId].startTime;
+                            audio.play().catch(e => console.log("Runtime Loop Error:", e));
+                        }
+                    });
+
+                    // viewer.js에 이식되어 있는 오디오 파이프에 노드 체인 연결
+                    if (window.audioPipeManager) {
+                        window.audioPipeManager.connectAudio(audio, 'bgm');
+                    }
+                    
+                    activeBgms[cardId] = {
+                        audio: audio,
+                        audioUrl: normalizeMediaPath(b.audioUrl),
+                        startCut: b.startCut,
+                        endCut: b.endCut,
+                        startTime: b.startTime,
+                        isPlaying: false
+                    };
+                }
+
+                const track = activeBgms[cardId];
+                if (inRange) {
+                    if (!track.isPlaying) {
+                        track.isPlaying = true;
+                        
+                        if (track.audio.fadeTimer) {
+                            clearInterval(track.audio.fadeTimer);
+                            track.audio.fadeTimer = null;
+                        }
+
+                        track.audio.currentTime = track.startTime;
+                        track.audio.volume = 0;
+                        
+                        track.audio.play().then(() => {
+                            fadeAudioRuntime(track.audio, 0, 0.25, 1000);
+                        }).catch(e => {
+                            console.log("BGM 자동 재생 블로킹 우회대기:", e);
+                            track.isPlaying = false;
+                        });
+                    }
+                } else {
+                    if (track.isPlaying) {
+                        track.isPlaying = false;
+                        const audioToFade = track.audio;
+                        fadeAudioRuntime(audioToFade, audioToFade.volume, 0, 1000, () => {
+                            audioToFade.pause();
+                            audioToFade.currentTime = track.startTime;
+                        });
+                    }
+                }
+            });
+        }
+
+        // BGM 전용 페이드 아웃/인 런타임 함수
+        function fadeAudioRuntime(audio, startVol, endVol, durationMs, onComplete) {
+            if (audio.fadeTimer) {
+                clearInterval(audio.fadeTimer);
+                audio.fadeTimer = null;
+            }
+            
+            const steps = 20;
+            const interval = durationMs / steps;
+            const volStep = (endVol - startVol) / steps;
+            let currentStep = 0;
+            
+            audio.volume = startVol;
+            
+            audio.fadeTimer = setInterval(() => {
+                currentStep++;
+                let nextVol = startVol + volStep * currentStep;
+                if (nextVol < 0) nextVol = 0;
+                if (nextVol > 1) nextVol = 1;
+                audio.volume = nextVol;
+                
+                if (currentStep >= steps) {
+                    clearInterval(audio.fadeTimer);
+                    audio.fadeTimer = null;
+                    audio.volume = endVol;
+                    if (onComplete) onComplete();
+                }
+            }, interval);
+        }
+
+        // 글로벌 BGM 데이터는 DOMContentLoaded 시점에 data.json 으로부터 단일 스트림으로 완전 병합 바인딩 완료됨.
+
+        // ================= 스크롤 속도 계산, 가속 제어 및 양방향 진행 방향 감지 변수들 =================
+        var lastScrollTop = 0;
+        var lastScrollTime = performance.now();
+        var scrollEndTimeout = null;
+        var decelAnimId = null;
+
+        function decelerateMultiplier() {
+            if (window.isFastForwarding) return; 
+            if (window.speedMultiplier > 1.0) {
+                window.speedMultiplier -= 0.15; 
+                if (window.speedMultiplier < 1.0) window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                decelAnimId = requestAnimationFrame(decelerateMultiplier);
+            } else {
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+            }
+        }
+
+        // 뷰어 스크롤 감지 및 제어 연동
+        viewerScrollContainer.addEventListener('scroll', () => {
+            if (cutsData.length === 0) return;
+
+            if (window.isFastForwarding) {
+                lastScrollTop = viewerScrollContainer.scrollTop;
+                return;
+            }
+            
+            const now = performance.now();
+            const scrollTop = viewerScrollContainer.scrollTop;
+            const dt = now - lastScrollTime;
+            
+            if (dt > 10) {
+                const dy = Math.abs(scrollTop - lastScrollTop);
+                const scrollVelocity = dy / dt; // px/ms
+                
+                if (decelAnimId) {
+                    cancelAnimationFrame(decelAnimId);
+                    decelAnimId = null;
+                }
+                
+                window.speedMultiplier = 1.0 + Math.min(5.0, scrollVelocity * 2.5);
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                
+                lastScrollTime = now;
+            }
+
+            window.isScrollDirectionDown = scrollTop >= lastScrollTop;
+            lastScrollTop = scrollTop;
+
+            clearTimeout(scrollEndTimeout);
+            scrollEndTimeout = setTimeout(function checkScrollEnd() {
+                const scrollTop = viewerScrollContainer.scrollTop;
+                const containerHeight = viewerScrollContainer.clientHeight || 740;
+                
+                const targetCutIdx = Math.round(scrollTop / containerHeight);
+                const targetScrollTop = targetCutIdx * containerHeight;
+                
+                if (Math.abs(scrollTop - targetScrollTop) > 3) {
+                    scrollEndTimeout = setTimeout(checkScrollEnd, 50);
+                    return;
+                }
+                
+                if (!window.isSyncScrolling) {
+                    const activeCut = cutsData[targetCutIdx];
+                    if (activeCut) {
+                        const settledCutId = activeCut.id;
+                        
+                        if (settledCutId !== window.lastSettledCutId) {
+                            // [원자적 상태 리셋] 스레드 1프레임 렌더링에 의한 대사 번쩍임(Flash) 현상을 완전히 원천 봉쇄합니다.
+                            window.isTimeBasedAutoplay = true;
+                            window.accumulatedTime = 0.0;
+                            
+                            window.lastSettledCutId = settledCutId;
+                            window.currentCutId = settledCutId;
+                            
+                            if (typeof window.triggerAutoplayForCurrentCut === 'function') {
+                                window.triggerAutoplayForCurrentCut();
+                            }
+                        } else {
+                            if (!window.isTimeBasedAutoplay) {
+                                if (typeof window.restoreEditMode === 'function') {
+                                    window.restoreEditMode();
+                                }
+                            }
+                        }
+                    }
+                }
+            }, 150);
+
+            if (typeof window.handleScrollUpdate === 'function') {
+                window.handleScrollUpdate();
+            }
+        });
+
+        // 물리 인터랙션 발생 시 자동 재생 중지
+        function handleUserDirectInteraction() {
+            // 400ms 미세 관성 및 사용자 터치 해제 잔여 이벤트 락아웃 가드
+            if (performance.now() - (window.autoplayStartTime || 0) < 400) {
+                return;
+            }
+            if (window.isTimeBasedAutoplay && !window.isProgrammaticPlaying) {
+                if (typeof window.restoreEditMode === 'function') {
+                    window.restoreEditMode();
+                }
+                console.log("⏹ 수동 조작으로 연출이 중지되었습니다.");
+            }
+        }
+        
+        viewerScrollContainer.addEventListener('wheel', handleUserDirectInteraction, { passive: true });
+        viewerScrollContainer.addEventListener('touchstart', handleUserDirectInteraction, { passive: true });
+        viewerScrollContainer.addEventListener('mousedown', (e) => {
+            if (e.target === viewerScrollContainer) {
+                handleUserDirectInteraction();
+            }
+        });
+
+        // ================= 사용자 최초 인터랙션 및 오디오 컨텍스트 락킹 해제 =================
+        function startCinematicViewer() {
+            if (isWebAudioInitialized) return;
+            isWebAudioInitialized = true;
+
+            // 1. Web Audio API 초기화 강제 트리거
+            if (window.audioPipeManager) {
+                window.audioPipeManager.init();
+                if (window.audioPipeManager.ctx && window.audioPipeManager.ctx.state === 'suspended') {
+                    window.audioPipeManager.ctx.resume().catch(() => {});
+                }
+            }
+
+            // 2. 인트로 오버레이 카드 미려하게 페이드아웃
+            introOverlay.style.opacity = '0';
+            setTimeout(() => {
+                introOverlay.style.display = 'none';
+            }, 600);
+
+            // 3. 첫번째 컷 오토플레이 즉시 트리거
+            if (cutsData.length > 0) {
+                const firstCutId = cutsData[0].id;
+                window.currentCutId = firstCutId;
+                window.lastSettledCutId = firstCutId;
+                
+                // BGM 동기화 개시
+                syncGlobalBgmsRuntime(1);
+                
+                // 1컷 자동 재생 기동
+                if (typeof window.triggerAutoplayForCurrentCut === 'function') {
+                    window.triggerAutoplayForCurrentCut();
+                }
+            }
+        }
+
+        // 인트로 오버레이 클릭 또는 감상 시작 버튼 터치 시 기동
+        introOverlay.addEventListener('click', startCinematicViewer);
+
+        // ================= [빨리감기] Double-click/tap and Hold 제스처 처리 =================
+        let lastMouseDownTime = 0;
+        let lastTouchStartTime = 0;
+
+        // 마우스 왼쪽 버튼 더블클릭 홀드 (웹/캔버스 환경)
+        viewerScrollContainer.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // 왼쪽 클릭만
+            const now = performance.now();
+            if (now - lastMouseDownTime < 300) {
+                window.isFastForwarding = true;
+                window.speedMultiplier = 4.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "⏩ 빨리 감기 진행 중 (4.0x)...";
+            }
+            lastMouseDownTime = now;
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            if (window.isFastForwarding) {
+                window.isFastForwarding = false;
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "스크롤 또는 Hold 시 빨리 감기";
+            }
+        });
+
+        // 스마트폰 터치 더블탭 홀드 (모바일/스마트폰 환경)
+        viewerScrollContainer.addEventListener('touchstart', (e) => {
+            const now = performance.now();
+            if (now - lastTouchStartTime < 300) {
+                window.isFastForwarding = true;
+                window.speedMultiplier = 4.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "⏩ 빨리 감기 진행 중 (4.0x)...";
+            }
+            lastTouchStartTime = now;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (window.isFastForwarding) {
+                window.isFastForwarding = false;
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "스크롤 또는 Hold 시 빨리 감기";
+            }
+        });
+
+        window.addEventListener('touchcancel', (e) => {
+            if (window.isFastForwarding) {
+                window.isFastForwarding = false;
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "스크롤 또는 Hold 시 빨리 감기";
+            }
+        });
+
+        // 수동 스크롤 조작에 따른 글로벌 BGM 동적 동기화 브릿지 매핑
+        window.syncGlobalBgmsRuntime = syncGlobalBgmsRuntime;
+
+    </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// =========================================================================
+﻿// =========================================================================
 // ?렗 ?뱁댆 ?쒕꽕留덊떛 酉곗뼱 怨듯넻 ?곗텧 諛??ъ슫???듭떖 ?붿쭊 紐⑤뱢 (viewer.js)
 // =========================================================================
 
@@ -725,6 +725,16 @@ function syncCutBubblesState(cutId, state) {
 
 // 1?④퀎 ?뚮뜑留??꾨젅???⑥닔 ?낅┰??諛?[?깅뒫 媛쒖꽑 4 - ??댄븨 ?뚮뜑留?罹먯떛] ?곸슜
 function renderItemsFrame() {
+    // 3. 렌더링 엔진 상태 동기화 및 안전장치 완화
+    // isFirstCutReady가 false일지라도 accumulatedTime(globalElapsed)이 0 이상이라면 화면을 렌더링함
+    if (window.isFirstCutReady === false && (typeof window.accumulatedTime !== 'number' || window.accumulatedTime < 0)) {
+        requestAnimationFrame(() => {
+            if (typeof renderItemsFrame === 'function') {
+                renderItemsFrame();
+            }
+        });
+        return;
+    }
     if (!audioPipeManager.ctx) {
         audioPipeManager.init();
     }
@@ -1526,14 +1536,73 @@ function createBubbleDOM(cutId, item) {
 }
 window.createBubbleDOM = createBubbleDOM;
 
-// Active Cut 以묒떖 Lazy Rendering & Swap 諛??대?吏 ?留??쒖뒪??
+// Active Cut 중심 Lazy Rendering & Swap 및 이미지 타임아웃 핵심 모듈 (viewer.js)
+
+// 명암 대비 색상 계산기 (Contrast YIQ)
+function getContrastYIQ(hexcolor){
+    if(!hexcolor) return '#111827';
+    hexcolor = hexcolor.replace("#", "");
+    var r = parseInt(hexcolor.substr(0,2),16);
+    var g = parseInt(hexcolor.substr(2,2),16);
+    var b = parseInt(hexcolor.substr(4,2),16);
+    var yiq = ((r*299)+(g*587)+(b*114))/1000;
+    return (yiq >= 128) ? '#111827' : '#ffffff'; 
+}
+window.getContrastYIQ = getContrastYIQ;
+
+// 말풍선 DOM 동적 생성기 (Swap-in 시)
+function createBubbleDOM(cutId, item) {
+    const bubble = document.createElement('div');
+    bubble.className = 'speech-bubble show';
+    bubble.id = `bubble_${item.id}`;
+    bubble.dataset.cardId = item.id;
+    bubble.style.left = `${item.x}%`;
+    bubble.style.top = `${item.y}%`;
+    bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
+    bubble.style.setProperty('--text-color', getContrastYIQ(item.charColor || '#ffffff'));
+
+    // 실시간 말꼬리 렌더링에 필요한 물리 속성들을 데이터셋으로 바인딩
+    bubble.dataset.baseAngle = item.baseAngle || 45;
+    bubble.dataset.tipDx = item.tipDx || 30;
+    bubble.dataset.tipDy = item.tipDy || 30;
+    bubble.dataset.baseWidth = item.baseWidth || 14;
+
+    bubble.innerHTML = `
+        <div class="bubble-shadow-layer"></div>
+        <div class="bubble-bg-cover"></div>
+        <svg class="tail-svg" viewBox="0 0 1000 1000" width="1000" height="1000" style="opacity: 1;">
+            <path class="bubble-path bubble-path-fill" d="" style="fill: var(--bubble-color); stroke: none; opacity: 1;" />
+            <path class="bubble-path bubble-path-stroke" d="" style="fill: none; stroke: #111827; stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; opacity: 1;" />
+        </svg>
+        <div class="bubble-text-layer">${item.text || ''}</div>
+        <div class="handle base-handle" title="뿌리 조절"></div><div class="handle tip-handle" title="꼬리 끝 조절"></div>
+    `;
+
+    // 꼬리 그리기 함수 호출
+    if (typeof updateTail === 'function') {
+        setTimeout(() => updateTail(bubble), 0);
+    } else if (typeof updateTailRuntime === 'function') {
+        setTimeout(() => updateTailRuntime(bubble, item.baseAngle, item.tipDx, item.tipDy, item.baseWidth), 0);
+    }
+    
+    // ResizeObserver 바인딩
+    const observer = window.resizeObserver;
+    if (observer) {
+        observer.observe(bubble);
+    }
+
+    return bubble;
+}
+window.createBubbleDOM = createBubbleDOM;
+
+// Active Cut 중심 Lazy Rendering & Swap 및 이미지 대기 시스템
 function swapActiveCutsDOM(activeCutId) {
     if (!cuts || cuts.length === 0) return;
     
     const activeCutIdx = cuts.findIndex(c => c.id === activeCutId);
     if (activeCutIdx === -1) return;
 
-    // ?쒖꽦 ?덈룄??踰붿쐞 寃곗젙 (?쒖꽦 而?+ ????1而?
+    // 활성 윈도우 범위 결정 (활성 컷 + 전후 1컷)
     const windowStart = Math.max(0, activeCutIdx - 1);
     const windowEnd = Math.min(cuts.length - 1, activeCutIdx + 1);
 
@@ -1544,19 +1613,19 @@ function swapActiveCutsDOM(activeCutId) {
         const inWindow = idx >= windowStart && idx <= windowEnd;
 
         if (inWindow) {
-            // Swap-in: ?쒖꽦 踰붿쐞???랁븳 寃쎌슦
-            // 1. 3以??덉씠???앹꽦
+            // Swap-in: 활성 범위에 속한 경우
+            // 1. 3중 레이어 생성
             const hasLayers = cutItem.querySelector('.cut-layer, .cut-bg-image');
             if (!hasLayers) {
                 if (typeof renderCutLayers === 'function') {
                     renderCutLayers(cutItem, cut);
                 } else {
-                    // viewer.html???덉씠???앹꽦 ?대갚
+                    // viewer.html의 레이어 생성 콜백
                     buildViewerLayersFallback(cutItem, cut);
                 }
             }
 
-            // 2. 留먰뭾??而⑦뀒?대꼫 諛?留먰뭾??DOM ?앹꽦
+            // 2. 말풍선 컨테이너 및 말풍선 DOM 생성
             let bubbleContainer = cutItem.querySelector('.bubble-container');
             if (!bubbleContainer) {
                 bubbleContainer = document.createElement('div');
@@ -1565,7 +1634,7 @@ function swapActiveCutsDOM(activeCutId) {
                 cutItem.appendChild(bubbleContainer);
             }
 
-            // 媛?????꾩씠?쒖뿉 ???留먰뭾??DOM ?앹꽦
+            // 각 대화 아이템에 대해 말풍선 DOM 생성
             const dialogueItems = (cut.items || []).filter(item => item.type === 'dialogue');
             dialogueItems.forEach(item => {
                 let bubble = document.getElementById(`bubble_${item.id}`) || bubbleContainer.querySelector(`[data-card-id="${item.id}"]`);
@@ -1574,15 +1643,15 @@ function swapActiveCutsDOM(activeCutId) {
                     bubbleContainer.appendChild(bubble);
                 }
                 
-                // ?몄쭛湲?移대뱶 諛붿씤???숆린??
+                // 편집기 카드 바인딩 동기화
                 const card = document.querySelector(`.dialogue-item[data-id="${item.id}"]`);
                 if (card) {
                     card.bubbleDOM = bubble;
                 }
             });
         } else {
-            // Swap-out (鍮꾪솢??而?: ?대?吏 ?留?& 硫붾え由??댁젣
-            // 1. 鍮꾨뵒???댁젣 諛??덉씠??DOM ?쒓굅
+            // Swap-out (비활성 컷): 이미지 해제 & 메모리 해제
+            // 1. 비디오 해제 및 레이어 DOM 제거
             const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
             layers.forEach(layer => {
                 if (layer.tagName === 'VIDEO') {
@@ -1595,7 +1664,7 @@ function swapActiveCutsDOM(activeCutId) {
                 layer.remove();
             });
 
-            // 2. 留먰뭾??DOM 諛?而⑦뀒?대꼫 鍮꾩슦湲?
+            // 2. 말풍선 DOM 및 컨테이너 비우기
             const bubbleContainer = cutItem.querySelector('.bubble-container');
             if (bubbleContainer) {
                 const observer = window.resizeObserver;
@@ -1609,7 +1678,7 @@ function swapActiveCutsDOM(activeCutId) {
                 bubbleContainer.innerHTML = "";
             }
 
-            // 3. ??由ъ뒪??移대뱶??bubbleDOM ?댁젣
+            // 3. 리스트 카드의 bubbleDOM 해제
             const dialogueItems = (cut.items || []).filter(item => item.type === 'dialogue');
             dialogueItems.forEach(item => {
                 const card = document.querySelector(`.dialogue-item[data-id="${item.id}"]`);
@@ -1622,7 +1691,7 @@ function swapActiveCutsDOM(activeCutId) {
 }
 window.swapActiveCutsDOM = swapActiveCutsDOM;
 
-// viewer.html???덉씠???앹꽦 ?ы띁
+// viewer.html의 레이어 생성 헬퍼
 function buildViewerLayersFallback(cutItem, c) {
     function buildLayer(layerIndex, layerObj) {
         if (!layerObj || !layerObj.url) return null;
@@ -1640,23 +1709,47 @@ function buildViewerLayersFallback(cutItem, c) {
             el.setAttribute('muted', '');
             el.setAttribute('playsinline', '');
 
-            // 泥?踰덉㎏ 而?Index 1) 鍮꾨뵒??濡쒕뱶 ?꾨즺 媛먯떆
+            // 첫 번째 컷(Index 1) 비디오 로드 완료 감시 및 2초 강제 타임아웃
             if (c.index === 1) {
-                el.addEventListener('loadeddata', () => {
+                let fallbackTriggered = false;
+                const forceShowTimeout = setTimeout(() => {
+                    fallbackTriggered = true;
                     cutItem.style.transition = 'opacity 0.3s ease';
                     cutItem.style.opacity = '1';
+                    window.isFirstCutReady = true;
+                    console.log("[Fallback Video Timeout] Force display Cut 1");
+                }, 2000);
+
+                el.addEventListener('loadeddata', () => {
+                    if (fallbackTriggered) return;
+                    clearTimeout(forceShowTimeout);
+                    cutItem.style.transition = 'opacity 0.3s ease';
+                    cutItem.style.opacity = '1';
+                    window.isFirstCutReady = true;
                 });
             }
         } else {
             el = document.createElement('div');
             el.style.backgroundImage = `url(${normalizeMediaPath(layerObj.url)})`;
 
-            // 泥?踰덉㎏ 而?Index 1) ?대?吏 濡쒕뱶 ?꾨즺 媛먯떆
+            // 첫 번째 컷(Index 1) 이미지 로드 완료 감시 및 2초 강제 타임아웃
             if (c.index === 1) {
-                const img = new Image();
-                img.onload = () => {
+                let fallbackTriggered = false;
+                const forceShowTimeout = setTimeout(() => {
+                    fallbackTriggered = true;
                     cutItem.style.transition = 'opacity 0.3s ease';
                     cutItem.style.opacity = '1';
+                    window.isFirstCutReady = true;
+                    console.log("[Fallback Image Timeout] Force display Cut 1");
+                }, 2000);
+
+                const img = new Image();
+                img.onload = () => {
+                    if (fallbackTriggered) return;
+                    clearTimeout(forceShowTimeout);
+                    cutItem.style.transition = 'opacity 0.3s ease';
+                    cutItem.style.opacity = '1';
+                    window.isFirstCutReady = true;
                 };
                 img.src = normalizeMediaPath(layerObj.url);
             }
@@ -1670,7 +1763,7 @@ function buildViewerLayersFallback(cutItem, c) {
         else if (layerIndex === 2) el.style.zIndex = '2';
         else if (layerIndex === 1) el.style.zIndex = '3';
 
-        // ?곗텧 ?④낵 ????곸슜
+        // 연출 효과 대상 적용
         if (c.effectType && c.effectType !== 'none' && c.effectType !== 'shake') {
             el.classList.add(`effect-${c.effectType}`);
         }
@@ -1678,7 +1771,7 @@ function buildViewerLayersFallback(cutItem, c) {
         return el;
     }
 
-    const l3 = buildLayer(3, c.layer3 || (c.bgImage ? { url: c.bgImage, name: c.bgImageName || '諛곌꼍', type: 'image' } : null));
+    const l3 = buildLayer(3, c.layer3 || (c.bgImage ? { url: c.bgImage, name: c.bgImageName || '배경', type: 'image' } : null));
     const l2 = buildLayer(2, c.layer2);
     const l1 = buildLayer(1, c.layer1);
 

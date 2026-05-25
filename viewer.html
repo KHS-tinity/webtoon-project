@@ -821,8 +821,8 @@
         // 뷰어 전용 selectCut 함수 정의
         function selectCut(cutId, smoothScroll = true) {
             try {
-                // cutId가 0(숫자)이면 첫 번째 컷의 ID로 대체 (강제 렌더링 동기화)
-                if (cutId === 0 && cutsData && cutsData.length > 0) {
+                // cutId가 0 또는 1(숫자)이면 첫 번째 컷의 ID로 대체 (강제 렌더링 동기화)
+                if ((cutId === 0 || cutId === 1) && cutsData && cutsData.length > 0) {
                     cutId = cutsData[0].id;
                 }
                 const targetItem = document.getElementById(`viewerCut_${cutId}`);
@@ -926,7 +926,10 @@
                 if (cutsData.length > 0) {
                     setTimeout(() => {
                         window.lastSettledCutId = null; // lastSettledCutId를 명시적으로 비워서 안착 판단 유도
-                        selectCut(0, false);
+                        selectCut(1, false);
+                        if (typeof window.renderItemsFrame === 'function') {
+                            window.requestAnimationFrame(window.renderItemsFrame);
+                        }
                     }, 50);
                 }
                 
@@ -941,7 +944,10 @@
                 if (cutsData.length > 0) {
                     setTimeout(() => {
                         window.lastSettledCutId = null;
-                        selectCut(0, false);
+                        selectCut(1, false);
+                        if (typeof window.renderItemsFrame === 'function') {
+                            window.requestAnimationFrame(window.renderItemsFrame);
+                        }
                     }, 50);
                 }
             }
@@ -1174,6 +1180,12 @@
                         
                         track.audio.play().then(() => {
                             fadeAudioRuntime(track.audio, 0, 0.25, 1000);
+                            
+                            // 배경음악과 화면 렌더링 동기화
+                            window.isFirstCutReady = true;
+                            if (typeof window.renderItemsFrame === 'function') {
+                                window.renderItemsFrame();
+                            }
                         }).catch(e => {
                             console.log("BGM 자동 재생 블로킹 우회대기:", e);
                             track.isPlaying = false;

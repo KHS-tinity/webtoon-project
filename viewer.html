@@ -630,8 +630,27 @@
                         const reader = new FileReader();
                         reader.onload = function(evt) {
                             try {
-                                const data = JSON.parse(evt.target.result);
-                                initializeViewer(data);
+                                const rawData = JSON.parse(evt.target.result);
+                                // 데이터 정규화 어댑터 기동 (0번 더미 컷 주입 포함)
+                                const normalizedData = window.normalizeAndMapProjectData(rawData);
+                                
+                                initializeViewer(normalizedData);
+                                
+                                // 기동 샌드박스: 가상 0번 더미 컷으로 킥 후 0.1초 뒤 1번 컷 전이
+                                if (cutsData.length > 0) {
+                                    setTimeout(() => {
+                                        window.lastSettledCutId = null;
+                                        selectCut(0, false);
+                                        
+                                        setTimeout(() => {
+                                            selectCut(1, false);
+                                            if (typeof window.renderItemsFrame === 'function') {
+                                                window.requestAnimationFrame(window.renderItemsFrame);
+                                            }
+                                        }, 100);
+                                    }, 50);
+                                }
+                                
                                 banner.style.opacity = '0';
                                 banner.style.transform = 'translateX(-50%) translateY(-10px)';
                                 setTimeout(() => banner.remove(), 300);
@@ -821,10 +840,36 @@
         // 뷰어 전용 selectCut 함수 정의
         function selectCut(cutId, smoothScroll = true) {
             try {
-                // cutId가 0 또는 1(숫자)이면 첫 번째 컷의 ID로 대체 (강제 렌더링 동기화)
-                if ((cutId === 0 || cutId === 1) && cutsData && cutsData.length > 0) {
-                    cutId = cutsData[0].id;
+                // 0번 가상 더미 컷과 1번 실제 컷 인덱스 분기 매핑
+                if (cutId === 0 && cutsData && cutsData.length > 0) {
+                    cutId = cutsData[0].id; // "cut_dummy_init"
+                } else if (cutId === 1 && cutsData && cutsData.length > 1) {
+                    cutId = cutsData[1].id; // 실제 첫 컷
+                } else if (cutId === 1 && cutsData && cutsData.length > 0) {
+                    cutId = cutsData[0].id; // 백업
                 }
+
+                // 0번 컷(초기화 가상 컷) 진입 시 모든 기존 미디어 및 말풍선 소거 (잔상 제거)
+                if (cutId === "cut_dummy_init") {
+                    document.querySelectorAll('.viewer-cut-item').forEach(cutItem => {
+                        cutItem.querySelectorAll('.cut-layer, .cut-bg-image').forEach(layer => {
+                            if (layer.tagName === 'VIDEO') {
+                                try {
+                                    layer.pause();
+                                    layer.src = "";
+                                    layer.load();
+                                } catch(e) {}
+                            }
+                            layer.remove();
+                        });
+                        const bubbleContainer = cutItem.querySelector('.bubble-container');
+                        if (bubbleContainer) {
+                            bubbleContainer.innerHTML = '';
+                        }
+                    });
+                    console.log("[Engine Reset] Cleared all layers and bubbles for dummy init cut");
+                }
+
                 const targetItem = document.getElementById(`viewerCut_${cutId}`);
                 if (targetItem) {
                     // 컷 변경 시마다 requestAnimationFrame을 사용하여 강제 Reflow 유도
@@ -842,12 +887,16 @@
                             }
                         });
                     } else {
+                        window.isSyncScrolling = true;
                         viewerScrollContainer.scrollTop = targetItem.offsetTop;
                         window.lastSettledCutId = cutId;
                         window.currentCutId = cutId;
                         if (typeof window.handleScrollUpdate === 'function') {
                             window.handleScrollUpdate();
                         }
+                        setTimeout(() => {
+                            window.isSyncScrolling = false;
+                        }, 50);
                     }
                 }
                 
@@ -923,13 +972,18 @@
                 initializeViewer(normalizedData);
                 
                 // 기동 샌드박스: 로드 직후 0.05초 이내 첫 번째 컷을 강제 selectCut 안착 및 첫 컷 연출 즉시 가동
+                // 기동 샌드박스: 가상 0번 더미 컷으로 즉시 킥스타트 후, 0.1초 뒤 1번 컷으로 매끄럽게 전이
                 if (cutsData.length > 0) {
                     setTimeout(() => {
                         window.lastSettledCutId = null; // lastSettledCutId를 명시적으로 비워서 안착 판단 유도
-                        selectCut(1, false);
-                        if (typeof window.renderItemsFrame === 'function') {
-                            window.requestAnimationFrame(window.renderItemsFrame);
-                        }
+                        selectCut(0, false); // 0번 컷 기동
+                        
+                        setTimeout(() => {
+                            selectCut(1, false); // 0.1초 뒤 1번 컷으로 이동
+                            if (typeof window.renderItemsFrame === 'function') {
+                                window.requestAnimationFrame(window.renderItemsFrame);
+                            }
+                        }, 100);
                     }, 50);
                 }
                 
@@ -944,10 +998,14 @@
                 if (cutsData.length > 0) {
                     setTimeout(() => {
                         window.lastSettledCutId = null;
-                        selectCut(1, false);
-                        if (typeof window.renderItemsFrame === 'function') {
-                            window.requestAnimationFrame(window.renderItemsFrame);
-                        }
+                        selectCut(0, false); // 0번 컷 기동
+                        
+                        setTimeout(() => {
+                            selectCut(1, false); // 0.1초 뒤 1번 컷으로 이동
+                            if (typeof window.renderItemsFrame === 'function') {
+                                window.requestAnimationFrame(window.renderItemsFrame);
+                            }
+                        }, 100);
                     }, 50);
                 }
             }
@@ -1381,7 +1439,8 @@
 
             // 3. 첫번째 컷 오토플레이 즉시 트리거
             if (cutsData.length > 0) {
-                const firstCutId = cutsData[0].id;
+                // 더미 컷이 있을 경우 실제 첫 번째 컷(index 1)을 타겟으로 함
+                const firstCutId = cutsData.length > 1 ? cutsData[1].id : cutsData[0].id;
                 window.currentCutId = firstCutId;
                 window.lastSettledCutId = firstCutId;
                 

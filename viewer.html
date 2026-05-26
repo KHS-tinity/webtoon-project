@@ -20,7 +20,7 @@
         });
     </script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>시네마틱 웹툰 사운드 뷰어 Runtime</title>
     <!-- Google Fonts & Pretendard CDN -->
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
@@ -1417,11 +1417,25 @@
             }
         });
 
+        // 모바일 바운스 스크롤 방어: viewerScrollContainer 내부 이외 영역의 터치 무브를 차단하여 화면 흔들림 방지
+        document.addEventListener('touchmove', function(e) {
+            if (!e.target.closest('#viewerScrollContainer')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
         // ================= 사용자 최초 인터랙션 및 오디오 컨텍스트 락킹 해제 =================
         function startCinematicViewer() {
             if (isWebAudioInitialized) return;
             isWebAudioInitialized = true;
             window.isAutoplayPending = false;
+
+            // User Gesture Unlock: 더미 무음 오디오를 터치 스택 내에서 재생 시도하여 모바일 오디오 락 해제
+            const dummyAudio = new Audio();
+            dummyAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+            dummyAudio.play().then(() => {
+                dummyAudio.pause();
+            }).catch(e => console.log("Audio unlock dummy play bypass:", e));
 
             // 1. Web Audio API 초기화 강제 트리거
             if (window.audioPipeManager) {

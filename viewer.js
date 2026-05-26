@@ -82,10 +82,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
 function normalizeMediaPath(url) {
     if (!url) return "";
-    if (url.startsWith('blob:') || url.startsWith('http:') || url.startsWith('https:') || url.startsWith('/') || url.includes('/') || url.includes('\\')) {
+    if (url.startsWith('blob:') || url.startsWith('http:') || url.startsWith('https:') || url.startsWith('./') || url.startsWith('../')) {
         return url;
     }
-    return '자료/' + url;
+    if (url.startsWith('/')) {
+        return '.' + url; // 절대 경로를 상대 경로화
+    }
+    return './자료/' + url;
 }
 window.normalizeMediaPath = normalizeMediaPath; // 전역 스코프 바인딩
 // ================= Web Audio API ?먮룞 ?뚯븬 ?뺢퇋??Auto-Normalization) ?쒖뒪??=================

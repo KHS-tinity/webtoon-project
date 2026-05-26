@@ -1667,7 +1667,7 @@ function swapActiveCutsDOM(activeCutId) {
             });
         } else {
             // Swap-out (비활성 컷): 이미지 해제 & 메모리 해제
-            // 1. 비디오 해제 및 레이어 DOM 제거
+            // 1. 비디오 해제 및 레이어 DOM 제거 (배경 이미지 스타일 명시적 해제로 GC 유도)
             const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
             layers.forEach(layer => {
                 if (layer.tagName === 'VIDEO') {
@@ -1676,6 +1676,8 @@ function swapActiveCutsDOM(activeCutId) {
                         layer.src = "";
                         layer.load();
                     } catch(e) {}
+                } else {
+                    layer.style.backgroundImage = '';
                 }
                 layer.remove();
             });

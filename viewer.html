@@ -1011,9 +1011,9 @@
             }
         }
 
-        // [동적 바인딩] DOMContentLoaded 시점에 비동기 Loader 호출
-        window.addEventListener('DOMContentLoaded', async () => {
-            await initViewerFromData('data.json');
+        // [동적 바인딩] DOMContentLoaded 시점에 data.json 자동 로딩을 제거하고 수동 로드 배너 상시 표출
+        window.addEventListener('DOMContentLoaded', () => {
+            showLocalServerGuide();
         });
 
         // viewer DOM 동적 빌더 (플레이스홀더만 생성하여 Lazy Rendering 보장)

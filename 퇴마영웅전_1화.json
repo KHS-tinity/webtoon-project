@@ -1,0 +1,340 @@
+{
+  "version": "2.0",
+  "projectTitle": "퇴마영웅전",
+  "thumbnail": "자료/002.jpg",
+  "chapter": 1,
+  "chapterTitle": "에필로그",
+  "bgms": [
+    {
+      "id": "item_9",
+      "name": "메인 브금",
+      "audioUrl": "대항해시대2 Ost - Menu Theme(AI).mp3",
+      "startCut": 1,
+      "endCut": 3,
+      "startTime": 0
+    }
+  ],
+  "cuts": [
+    {
+      "id": "cut_0",
+      "index": 1,
+      "layer1": null,
+      "layer2": null,
+      "layer3": {
+        "url": "1.jpg",
+        "name": "1.jpg",
+        "type": "image"
+      },
+      "bgImage": "1.jpg",
+      "bgImageName": "1.jpg",
+      "effectType": "none",
+      "items": [
+        {
+          "id": "item_0",
+          "type": "dialogue",
+          "charName": "주인공",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 0.5,
+          "duration": 1.5,
+          "x": 15,
+          "y": 20,
+          "baseAngle": 324.8,
+          "tipDx": 103.7,
+          "tipDy": -61.5,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_1",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 2.3,
+          "duration": 2,
+          "x": 10,
+          "y": 40,
+          "baseAngle": 45,
+          "tipDx": -0.4,
+          "tipDy": 49.9,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_5",
+          "baseAngle": 45,
+          "tipDx": 19.2,
+          "tipDy": 68,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_6",
+          "baseAngle": 245.6,
+          "tipDx": 14.1,
+          "tipDy": -136.8,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_7",
+          "baseAngle": 45,
+          "tipDx": 40,
+          "tipDy": 40,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_8",
+          "baseAngle": 45,
+          "tipDx": 40,
+          "tipDy": 40,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_3",
+          "baseAngle": 146.4,
+          "tipDx": -82.7,
+          "tipDy": 52.1,
+          "baseWidth": 28
+        },
+        {
+          "id": "item_4",
+          "baseAngle": 323.9,
+          "tipDx": 76.6,
+          "tipDy": -91.4,
+          "baseWidth": 14
+        }
+      ]
+    },
+    {
+      "id": "cut_1",
+      "index": 2,
+      "layer1": null,
+      "layer2": null,
+      "layer3": {
+        "url": "2.jpg",
+        "name": "2.jpg",
+        "type": "image"
+      },
+      "bgImage": "2.jpg",
+      "bgImageName": "2.jpg",
+      "effectType": "none",
+      "items": [
+        {
+          "id": "item_0",
+          "baseAngle": 60,
+          "tipDx": 50,
+          "tipDy": 50,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_3",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 0.5,
+          "duration": 2,
+          "x": 48.5,
+          "y": 9.2,
+          "baseAngle": 146.4,
+          "tipDx": -82.7,
+          "tipDy": 52.1,
+          "baseWidth": 28
+        },
+        {
+          "id": "item_4",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 2.7,
+          "duration": 2,
+          "x": 0.9,
+          "y": 86,
+          "baseAngle": 323.9,
+          "tipDx": 76.6,
+          "tipDy": -91.4,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_1",
+          "baseAngle": 45,
+          "tipDx": -0.4,
+          "tipDy": 49.9,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_5",
+          "baseAngle": 45,
+          "tipDx": 19.2,
+          "tipDy": 68,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_6",
+          "baseAngle": 245.6,
+          "tipDx": 14.1,
+          "tipDy": -136.8,
+          "baseWidth": 14
+        }
+      ]
+    },
+    {
+      "id": "cut_2",
+      "index": 3,
+      "layer1": null,
+      "layer2": null,
+      "layer3": {
+        "url": "3.jpg",
+        "name": "3.jpg",
+        "type": "image"
+      },
+      "bgImage": "3.jpg",
+      "bgImageName": "3.jpg",
+      "effectType": "none",
+      "items": [
+        {
+          "id": "item_1",
+          "baseAngle": 45,
+          "tipDx": -0.4,
+          "tipDy": 49.9,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_5",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 0.5,
+          "duration": 2,
+          "x": 4.1,
+          "y": 5,
+          "baseAngle": 45,
+          "tipDx": 19.2,
+          "tipDy": 68,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_6",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 2.6,
+          "duration": 2,
+          "x": 35.9,
+          "y": 63.4,
+          "baseAngle": 245.6,
+          "tipDx": 14.1,
+          "tipDy": -136.8,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_3",
+          "baseAngle": 146.4,
+          "tipDx": -82.7,
+          "tipDy": 52.1,
+          "baseWidth": 28
+        },
+        {
+          "id": "item_4",
+          "baseAngle": 323.9,
+          "tipDx": 76.6,
+          "tipDy": -91.4,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_7",
+          "baseAngle": 45,
+          "tipDx": 40,
+          "tipDy": 40,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_8",
+          "baseAngle": 45,
+          "tipDx": 40,
+          "tipDy": 40,
+          "baseWidth": 14
+        }
+      ]
+    },
+    {
+      "id": "cut_3",
+      "index": 4,
+      "layer1": null,
+      "layer2": null,
+      "layer3": null,
+      "bgImage": null,
+      "bgImageName": null,
+      "effectType": "none",
+      "items": [
+        {
+          "id": "item_3",
+          "baseAngle": 146.4,
+          "tipDx": -82.7,
+          "tipDy": 52.1,
+          "baseWidth": 28
+        },
+        {
+          "id": "item_4",
+          "baseAngle": 323.9,
+          "tipDx": 76.6,
+          "tipDy": -91.4,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_7",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 0.5,
+          "duration": 2,
+          "x": 10,
+          "y": 20,
+          "baseAngle": 45,
+          "tipDx": 40,
+          "tipDy": 40,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_8",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 2.9,
+          "duration": 2,
+          "x": 10,
+          "y": 40,
+          "baseAngle": 45,
+          "tipDx": 40,
+          "tipDy": 40,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_5",
+          "baseAngle": 45,
+          "tipDx": 19.2,
+          "tipDy": 68,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_6",
+          "baseAngle": 245.6,
+          "tipDx": 14.1,
+          "tipDy": -136.8,
+          "baseWidth": 14
+        }
+      ]
+    }
+  ]
+}

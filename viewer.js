@@ -1,4 +1,4 @@
-// =========================================================================
+﻿// =========================================================================
 // ?렗 ?뱁댆 ?쒕꽕留덊떛 酉곗뼱 怨듯넻 ?곗텧 諛??ъ슫???듭떖 ?붿쭊 紐⑤뱢 (viewer.js)
 // =========================================================================
 
@@ -25,10 +25,14 @@ window.isScrollDirectionDown = window.isScrollDirectionDown || true;
 window.viewerScrollContainer = window.viewerScrollContainer || null;
 window.isBgmVolumeMuted = window.isBgmVolumeMuted || false;
 window.isAutoplayPending = window.isAutoplayPending || false;
+window.currentCutObject = window.currentCutObject || null;
+window.currentCutObject = window.currentCutObject || null;
 
 // 2. ?ㅽ겕由쏀듃 ?꾩뿭 ?ㅼ퐫??蹂???뺤쓽
 var cuts;
 var currentCutId;
+var currentCutObject;
+var currentCutObject;
 var isSyncScrolling;
 var programmaticScrollAnimId;
 var isTimeBasedAutoplay;
@@ -55,6 +59,8 @@ var audioPipeManager;
 window.addEventListener('DOMContentLoaded', () => {
     cuts = window.cuts = window.cuts || [];
     currentCutId = window.currentCutId = window.currentCutId || null;
+    currentCutObject = window.currentCutObject = window.currentCutObject || null;
+    currentCutObject = window.currentCutObject = window.currentCutObject || null;
     isSyncScrolling = window.isSyncScrolling = window.isSyncScrolling || false;
     programmaticScrollAnimId = window.programmaticScrollAnimId = window.programmaticScrollAnimId || null;
     isTimeBasedAutoplay = window.isTimeBasedAutoplay = window.isTimeBasedAutoplay || false;
@@ -76,6 +82,8 @@ window.addEventListener('DOMContentLoaded', () => {
     viewerScrollContainer = window.viewerScrollContainer = window.viewerScrollContainer || null;
     isBgmVolumeMuted = window.isBgmVolumeMuted = window.isBgmVolumeMuted || false;
     isAutoplayPending = window.isAutoplayPending = window.isAutoplayPending || false;
+window.currentCutObject = window.currentCutObject || null;
+window.currentCutObject = window.currentCutObject || null;
 
     audioPipeManager = window.audioPipeManager = window.audioPipeManager || new WebAudioPipeManager();
 });
@@ -355,6 +363,7 @@ function sandboxOtherCuts(activeCutId) {
                     }
 
                     bubble.classList.remove('show');
+                    bubble.lastOpacity = '0';
                     bubble.classList.add('animate');
                     bubble.style.opacity = '0';
                     
@@ -509,8 +518,9 @@ function handleScrollUpdate() {
             cutImageName.textContent = activeCut.bgImageName || '?좏깮???뚯씪 ?놁쓬';
         }
 
+        currentCutObject = window.currentCutObject = activeCut;
+        currentCutObject = window.currentCutObject = activeCut;
         buildPlayItemsQueue(bestCutId);
-
         // [?깅뒫 媛쒖꽑 1 - Lazy Rendering Swap 湲곕룞]
         if (typeof swapActiveCutsDOM === 'function') {
             swapActiveCutsDOM(bestCutId);
@@ -562,7 +572,7 @@ function renderCutVisualEffects(cutId, progress, isScrolled) {
     const cutItem = document.getElementById(`viewerCut_${cutId}`);
     if (!cutItem) return;
     const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
-    const cut = cuts.find(c => c.id === cutId);
+    const cut = (cutId === currentCutId && window.currentCutObject) ? window.currentCutObject : cuts.find(c => c.id === cutId);
     if (!cut) return;
     
     const effect = cut.effectType || 'none';
@@ -677,6 +687,7 @@ function syncCutBubblesState(cutId, state) {
                         });
                     }
                     
+                    bubble.lastOpacity = '1';
                     bubble.classList.add('show');
                 }
                 
@@ -690,7 +701,7 @@ function syncCutBubblesState(cutId, state) {
                 const spans = bubble.querySelectorAll('.typing-wrapper span');
                 spans.forEach(s => s.style.opacity = '1');
             } else {
-                if (bubble.classList.contains('show') || bubble.style.opacity !== '0') {
+                if (bubble.lastOpacity !== '0' && (bubble.classList.contains('show') || bubble.style.opacity !== '0')) {
                     bubble.style.transition = 'none';
                     if (tailSvg) tailSvg.style.transition = 'none';
                     if (paths.length > 0) {
@@ -700,6 +711,7 @@ function syncCutBubblesState(cutId, state) {
                     }
                     
                     bubble.classList.remove('show');
+                    bubble.lastOpacity = '0';
                     bubble.classList.add('animate');
                     bubble.style.opacity = '0';
                     if (tailSvg) tailSvg.style.opacity = '0';
@@ -719,8 +731,11 @@ function syncCutBubblesState(cutId, state) {
                         });
                     }
                 }
-                const spans = bubble.querySelectorAll('.typing-wrapper span');
-                spans.forEach(s => s.style.opacity = '0');
+                if (bubble.lastSpansToShow !== 0) {
+                    bubble.lastSpansToShow = 0;
+                    const spans = bubble.querySelectorAll('.typing-wrapper span');
+                    spans.forEach(s => s.style.opacity = '0');
+                }
             }
         }
     });
@@ -760,7 +775,7 @@ function renderItemsFrame() {
                 const tailSvg = bubble.querySelector('.tail-svg');
                 const paths = bubble.querySelectorAll('.bubble-path');
                 
-                if (bubble.classList.contains('show') || bubble.style.opacity !== '0') {
+                if (bubble.lastOpacity !== '0' && (bubble.classList.contains('show') || bubble.style.opacity !== '0')) {
                     bubble.style.transition = 'none';
                     if (tailSvg) tailSvg.style.transition = 'none';
                     if (paths.length > 0) {
@@ -782,10 +797,14 @@ function renderItemsFrame() {
                         paths.forEach(p => p.style.transition = '');
                     }
                     
+                    bubble.lastOpacity = '0';
                     bubble.classList.add('animate');
                 }
-                const spans = bubble.querySelectorAll('.typing-wrapper span');
-                spans.forEach(s => s.style.opacity = '0');
+                if (bubble.lastSpansToShow !== 0) {
+                    bubble.lastSpansToShow = 0;
+                    const spans = bubble.querySelectorAll('.typing-wrapper span');
+                    spans.forEach(s => s.style.opacity = '0');
+                }
             }
             if (item.audioObj) {
                 item.audioObj.pause();
@@ -799,7 +818,7 @@ function renderItemsFrame() {
                 const tailSvg = bubble.querySelector('.tail-svg');
                 const paths = bubble.querySelectorAll('.bubble-path');
                 
-                if (!bubble.classList.contains('show') || bubble.style.opacity === '0') {
+                if (bubble.lastOpacity !== '1' && (!bubble.classList.contains('show') || bubble.style.opacity === '0')) {
                     bubble.style.transition = 'none';
                     if (tailSvg) tailSvg.style.transition = 'none';
                     if (paths.length > 0) {
@@ -828,6 +847,7 @@ function renderItemsFrame() {
                         });
                     }
                     
+                    bubble.lastOpacity = '1';
                     bubble.classList.add('show');
                 }
                 
@@ -838,8 +858,8 @@ function renderItemsFrame() {
                     const spansToShow = Math.floor(spans.length * progressPct);
                     
                     // 罹먯떛 ?곸슜: ?댁쟾 ?꾨젅?꾧낵 ?숈씪??媛쒖닔?쇰㈃ DOM 媛깆떊 李⑤떒
-                    if (item.lastSpansToShow !== spansToShow) {
-                        item.lastSpansToShow = spansToShow;
+                    if (bubble.lastSpansToShow !== spansToShow) {
+                        bubble.lastSpansToShow = spansToShow;
                         for (let i = 0; i < spans.length; i++) {
                             spans[i].style.opacity = (i < spansToShow) ? '1' : '0';
                         }
@@ -894,7 +914,10 @@ function renderItemsFrame() {
                 playhead.style.opacity = '1';
                 let pct = (accumulatedTime / 10.0) * 100;
                 if (pct > 100) pct = 100;
-                playhead.style.left = `${pct}%`;
+                if (playhead.lastPct !== pct) {
+                    playhead.lastPct = pct;
+                    playhead.style.left = `${pct}%`;
+                }
             }
         });
     }
@@ -919,7 +942,7 @@ function updateRealtimeTimeline(mySessionId) {
         const dt = ((now - lastFrameTime) / 1000.0) * speedMultiplier;
         accumulatedTime += dt;
         
-        const cut = cuts.find(c => c.id === currentCutId);
+        const cut = window.currentCutObject || cuts.find(c => c.id === currentCutId);
         const effect = cut ? (cut.effectType || 'none') : 'none';
         const effectDurationMap = {
             none: 0,
@@ -966,14 +989,20 @@ function updateRealtimeTimeline(mySessionId) {
         Object.values(window.activeBgms).forEach(track => {
             if (track.isPlaying && track.audio && !track.audio.fadeTimer) {
                 const currentVol = track.audio.volume;
-                // 留ㅻ걚?ъ슫 ?좏삎 蹂닿컙 媛먯뇙/蹂듦뎄 (lerp)
-                track.audio.volume = currentVol + (targetBgmVol - currentVol) * 0.1;
+                const nextVol = currentVol + (targetBgmVol - currentVol) * 0.1;
+                if (Math.abs(currentVol - targetBgmVol) > 0.001) {
+                    track.audio.volume = nextVol;
+                } else if (currentVol !== targetBgmVol) {
+                    track.audio.volume = targetBgmVol;
+                }
             }
         });
+
+
     }
 
     if (isTimeBasedAutoplay && currentCutId) {
-        const cut = cuts.find(c => c.id === currentCutId);
+        const cut = window.currentCutObject || cuts.find(c => c.id === currentCutId);
         const effect = cut ? (cut.effectType || 'none') : 'none';
         const effectDurationMap = {
             none: 0,
@@ -1019,8 +1048,9 @@ function triggerAutoplayForCurrentCut() {
     // ?대떦 而??곗텧 ?④낵瑜?0% ?곹깭濡??좎젣 ?쏀궧?섏뿬 1?꾨젅?????寃고븿???꾩쟾??李⑤떒?⑸땲??
     renderCutVisualEffects(currentCutId, 0, true);
 
+    currentCutObject = window.currentCutObject = cuts.find(c => c.id === currentCutId);
+    currentCutObject = window.currentCutObject = cuts.find(c => c.id === currentCutId);
     buildPlayItemsQueue(currentCutId);
-
     const mySessionId = Math.random();
     activeSessionId = mySessionId;
     isPlayMode = true;
@@ -1166,7 +1196,7 @@ function buildPlayItemsQueue(cutId) {
     playItemsQueue = [];
     stopAllAudios();
 
-    const cut = cuts.find(c => c.id === cutId);
+    const cut = (cutId === currentCutId && window.currentCutObject) ? window.currentCutObject : cuts.find(c => c.id === cutId);
     if (!cut) return 0;
 
     let maxDuration = 2.0; // 理쒖냼 ?ъ깮 蹂댁옣 ?쒓컙
@@ -1268,6 +1298,7 @@ function buildPlayItemsQueue(cutId) {
         }
     }
 
+    playItemsQueue.sort((a, b) => a.startSec - b.startSec);
     maxCutDuration = maxDuration;
     return playItemsQueue.length;
 }

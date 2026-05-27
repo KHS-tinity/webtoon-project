@@ -2,6 +2,22 @@
 <html lang="ko">
 <head>
     <script>
+        // 외부 직접 진입 차단 프록시 가드 (보안장치)
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fileParam = urlParams.get('file');
+            
+            // 로컬 개발 환경에서의 새로고침을 배려하기 위해 sessionStorage와 referrer를 둘 다 체크합니다.
+            const referrer = document.referrer || "";
+            const isFromHome = referrer.indexOf('home.html') !== -1 || sessionStorage.getItem('allowViewerEntry') === 'true';
+            
+            // 만약 파일 파라미터가 지정되어 있으나, 정상 진입 경로(home.html)가 아니거나 진입 세션키가 없다면 차단 및 튕겨내기
+            if (fileParam && !isFromHome) {
+                console.warn("[Entry Blocked] Redirecting to home.html");
+                window.location.replace('home.html');
+            }
+        })();
+
         window.addEventListener('error', function(e) {
             const errorDiv = document.createElement('div');
             errorDiv.style.position = 'fixed';
@@ -494,235 +510,6 @@
         var viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
         var introOverlay = window.introOverlay = document.getElementById('introOverlay');
 
-        // 로컬 파일 시스템 구동 시 CORS 에러 완충용 프리미엄 기본 시네마틱 폴백 데이터
-        const fallbackData = {
-          "bgms": [
-            {
-              "id": "bgm_1",
-              "name": "대항해시대2 Ost - Menu Theme",
-              "audioUrl": "대항해시대2 Ost - Menu Theme(AI).mp3",
-              "startCut": 1,
-              "endCut": 2,
-              "startTime": 0.0
-            },
-            {
-              "id": "bgm_2",
-              "name": "Uncharted Waters - 01 Opening",
-              "audioUrl": "Uncharted Waters - 01 Opening.mp3",
-              "startCut": 3,
-              "endCut": 3,
-              "startTime": 0.0
-            }
-          ],
-          "cuts": [
-            {
-              "id": "cut_0",
-              "index": 1,
-              "bgImageName": "1.jpg",
-              "bgImage": "1.jpg",
-              "effectType": "fade",
-              "items": [
-                {
-                  "id": "item_0",
-                  "type": "dialogue",
-                  "charName": "페레로",
-                  "charColor": "#e0e7ff",
-                  "text": "이곳이 바로... 소문으로만 듣던 신비의 섬인가?",
-                  "audioUrl": "녹음.m4a",
-                  "start": 0.5,
-                  "duration": 3.0,
-                  "x": 15.0,
-                  "y": 20.0,
-                  "baseAngle": 45.0,
-                  "tipDx": 35.0,
-                  "tipDy": 35.0
-                }
-              ]
-            },
-            {
-              "id": "cut_1",
-              "index": 2,
-              "bgImageName": "2.jpg",
-              "bgImage": "2.jpg",
-              "effectType": "shake",
-              "items": [
-                {
-                  "id": "item_1",
-                  "type": "dialogue",
-                  "charName": "알 베자스",
-                  "charColor": "#fee2e2",
-                  "text": "으윽! 갑자기 거대한 해일이 몰려오고 있다! 쾅!!",
-                  "audioUrl": "녹음.m4a",
-                  "start": 0.2,
-                  "duration": 3.5,
-                  "x": 20.0,
-                  "y": 50.0,
-                  "baseAngle": 135.0,
-                  "tipDx": -40.0,
-                  "tipDy": 40.0
-                }
-              ]
-            }
-          ]
-        };
-
-        // 로컬 웹 서버 실행 안내 모달 및 배너 연출
-        function showLocalServerGuide() {
-            if (document.getElementById('localServerGuideBanner')) return;
-
-            const banner = document.createElement('div');
-            banner.id = 'localServerGuideBanner';
-            banner.style.position = 'absolute';
-            banner.style.top = '100px'; // BGM 버튼과 겹치지 않게 노치 아래쪽으로 위치 하강
-            banner.style.left = '50%';
-            banner.style.transform = 'translateX(-50%)';
-            banner.style.width = '90%';
-            banner.style.maxWidth = '320px';
-            banner.style.background = 'rgba(15, 23, 42, 0.95)'; // 프리미엄 다크 유리모피즘 배경
-            banner.style.border = '1px solid rgba(99, 102, 241, 0.35)'; // 프리미엄 테두리
-            banner.style.backdropFilter = 'blur(20px)';
-            banner.style.webkitBackdropFilter = 'blur(20px)';
-            banner.style.borderRadius = '1.5rem';
-            banner.style.padding = '1rem';
-            banner.style.zIndex = '500'; // BGM/FAB 버튼보다 위에 표시되도록 레이어 순위 보장
-            banner.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.6)';
-            banner.style.display = 'flex';
-            banner.style.flexDirection = 'column';
-            banner.style.gap = '0.6rem';
-            banner.style.transition = 'all 0.3s ease';
-
-            banner.innerHTML = `
-                <div style="display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; margin-bottom: 0.2rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; font-weight: 800; color: #a5b4fc;">
-                        <span>ℹ️ 로컬 파일(CORS 제한) 모드</span>
-                    </div>
-                </div>
-                <p style="margin: 0; font-size: 0.72rem; color: #cbd5e1; line-height: 1.5; text-align: left; word-break: keep-all;">
-                    브라우저 CORS 제한으로 기본 폴백 데이터로 구동 중입니다. 직접 편집기에서 저장(내보내기)한 <strong>data.json</strong> 또는 <strong>JSON 파일</strong>을 아래 버튼을 통해 바로 불러와 감상하실 수 있습니다!
-                </p>
-                <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.3rem;">
-                    <input type="file" id="localJsonFileInput" accept=".json" style="display: none;">
-                    <button id="selectLocalJsonBtn" style="background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: #ffffff; border-radius: 8px; padding: 0.5rem; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(99,102,241,0.25); display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
-                        📁 직접 내보낸 JSON 파일 불러오기
-                    </button>
-                    <button id="showGuideBtn" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #e2e8f0; border-radius: 8px; padding: 0.4rem; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                        🌐 로컬 웹 서버 구동방법 확인
-                    </button>
-                </div>
-            `;
-
-            const mobileFrame = document.getElementById('mobileFrame');
-            if (mobileFrame) {
-                mobileFrame.appendChild(banner);
-            }
-
-            const selectBtn = document.getElementById('selectLocalJsonBtn');
-            const fileInput = document.getElementById('localJsonFileInput');
-            if (selectBtn && fileInput) {
-                selectBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    fileInput.click();
-                });
-
-                fileInput.addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onload = function(evt) {
-                            try {
-                                const rawData = JSON.parse(evt.target.result);
-                                // 데이터 정규화 어댑터 기동 (0번 더미 컷 주입 포함)
-                                const normalizedData = window.normalizeAndMapProjectData(rawData);
-                                
-                                initializeViewer(normalizedData);
-                                
-                                // 기동 샌드박스: 가상 0번 더미 컷으로 킥 후 0.1초 뒤 1번 컷 전이
-                                if (cutsData.length > 0) {
-                                    setTimeout(() => {
-                                        window.lastSettledCutId = null;
-                                        selectCut(0, false);
-                                        
-                                        setTimeout(() => {
-                                            selectCut(1, false);
-                                            if (typeof window.renderItemsFrame === 'function') {
-                                                window.requestAnimationFrame(window.renderItemsFrame);
-                                            }
-                                        }, 100);
-                                    }, 50);
-                                }
-                                
-                                banner.style.opacity = '0';
-                                banner.style.transform = 'translateX(-50%) translateY(-10px)';
-                                setTimeout(() => banner.remove(), 300);
-                            } catch (err) {
-                                alert("유효하지 않은 JSON 파일 형식입니다: " + err.message);
-                            }
-                        };
-                        reader.readAsText(file);
-                    }
-                });
-            }
-
-            document.getElementById('showGuideBtn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                showServerModal();
-            });
-        }
-
-        function showServerModal() {
-            const modal = document.createElement('div');
-            modal.style.position = 'absolute';
-            modal.style.top = '0'; modal.style.left = '0'; modal.style.right = '0'; modal.style.bottom = '0';
-            modal.style.background = 'rgba(15, 23, 42, 0.94)';
-            modal.style.backdropFilter = 'blur(16px)';
-            modal.style.webkitBackdropFilter = 'blur(16px)';
-            modal.style.zIndex = '600';
-            modal.style.display = 'flex';
-            modal.style.justifyContent = 'center';
-            modal.style.alignItems = 'center';
-            modal.style.padding = '1.5rem';
-            modal.style.color = '#f8fafc';
-            modal.style.opacity = '0';
-            modal.style.transition = 'opacity 0.3s ease';
-
-            modal.innerHTML = `
-                <div style="background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); padding: 1.8rem 1.4rem; border-radius: 2rem; width: 100%; max-width: 290px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: left;">
-                    <div style="font-size: 1.6rem; margin-bottom: 0.5rem;">🚀</div>
-                    <h3 style="margin: 0 0 0.6rem 0; font-size: 1.1rem; font-weight: 800; font-family: 'Outfit', sans-serif;">로컬 서버 실행 가이드</h3>
-                    <p style="margin: 0 0 1rem 0; font-size: 0.76rem; color: #94a3b8; line-height: 1.5; word-break: keep-all;">
-                        브라우저 보안(CORS) 정책에 따라, 파일 경로(<code>file://</code>)로 직접 접근 시 비동기 <code>fetch</code>가 차단됩니다. 아래 중 편한 방법으로 가상 서버를 기동해 감상해 주십시오.
-                    </p>
-                    
-                    <div style="background: rgba(15, 23, 42, 0.6); border-radius: 0.85rem; padding: 0.85rem; font-size: 0.7rem; font-family: monospace; color: #38bdf8; margin-bottom: 1.2rem; border: 1px solid rgba(255,255,255,0.05); line-height: 1.5; word-break: break-all;">
-                        <strong style="color: #fff;">💡 방법 1: VS Code 확장 기능</strong><br>
-                        1. VS Code에서 폴더 열기<br>
-                        2. <code>Live Server</code> 확장 설치<br>
-                        3. 하단 상태 표시줄 <code>Go Live</code> 클릭<br><br>
-                        <strong style="color: #fff;">💡 방법 2: Node.js 터미널</strong><br>
-                        <code>npx serve</code><br><br>
-                        <strong style="color: #fff;">💡 방법 3: Python 터미널</strong><br>
-                        <code>python -m http.server 8000</code>
-                    </div>
-
-                    <button id="closeServerModal" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; padding: 0.8rem; border-radius: 12px; font-size: 0.85rem; font-weight: 700; cursor: pointer; width: 100%; box-shadow: 0 6px 20px rgba(99,102,241,0.3); transition: all 0.2s;">
-                        돌아가기
-                    </button>
-                </div>
-            `;
-
-            const mobileFrame = document.getElementById('mobileFrame');
-            if (mobileFrame) {
-                mobileFrame.appendChild(modal);
-                void modal.offsetWidth;
-                modal.style.opacity = '1';
-            }
-
-            document.getElementById('closeServerModal').addEventListener('click', () => {
-                modal.style.opacity = '0';
-                setTimeout(() => modal.remove(), 300);
-            });
-        }
-
         // 수려한 프리미엄 스키마 버전 매칭 토스트 알림창
         function showVersionNotification(version) {
             const toast = document.createElement('div');
@@ -959,9 +746,8 @@
         // 비동기 프로젝트 로더 및 샌드박스 초기 안착 기동 함수
         async function initViewerFromData(dataPath = 'data.json') {
             try {
-                console.log(`[initViewerFromData] Async loading: ${dataPath}`);
-                const res = await fetch(`${dataPath}?t=${Date.now()}`);
-                if (!res.ok) throw new Error("data.json 로드 실패");
+                const res = await fetch(dataPath + (dataPath.includes('?') ? '&' : '?') + 't=' + Date.now());
+                if (!res.ok) throw new Error("데이터 로드 실패");
                 
                 const rawData = await res.json();
                 
@@ -988,32 +774,45 @@
                 }
                 
             } catch (err) {
-                console.warn("로컬 환경 파일 시스템(CORS 제한) 우회: 폴백 데이터로 기동합니다.", err);
-                showLocalServerGuide();
+                console.error("에피소드 파일 로딩 실패:", err);
                 
-                // 폴백 데이터 매핑 및 정규화
-                const normalizedFallback = window.normalizeAndMapProjectData(fallbackData);
-                initializeViewer(normalizedFallback);
+                // BGM 버튼 및 플로터 숨김
+                const bgmBtn = document.getElementById('bgmToggleBtn');
+                if (bgmBtn) bgmBtn.style.display = 'none';
+                const floater = document.querySelector('.viewer-floater');
+                if (floater) floater.style.display = 'none';
                 
-                if (cutsData.length > 0) {
-                    setTimeout(() => {
-                        window.lastSettledCutId = null;
-                        selectCut(0, false); // 0번 컷 기동
-                        
-                        setTimeout(() => {
-                            selectCut(1, false); // 0.1초 뒤 1번 컷으로 이동
-                            if (typeof window.renderItemsFrame === 'function') {
-                                window.requestAnimationFrame(window.renderItemsFrame);
-                            }
-                        }, 100);
-                    }, 50);
+                // introOverlay를 에러 메시지 카드로 교체
+                if (introOverlay) {
+                    introOverlay.style.display = 'flex';
+                    introOverlay.innerHTML = `
+                        <div class="intro-card" style="border: 2px solid #ef4444; box-shadow: 0 0 30px rgba(239, 68, 68, 0.25);">
+                            <div class="intro-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: 800;">Error</div>
+                            <div class="intro-icon" style="font-size: 3.5rem; margin: 1rem 0;">⚠️</div>
+                            <div class="intro-title" style="font-size: 1.6rem; font-weight: 800; color: #f8fafc;">에피소드 로드 실패</div>
+                            <div class="intro-desc" style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.6; margin: 1rem 0; word-break: break-all;">
+                                에피소드 파일(<strong>${dataPath}</strong>)을 불러올 수 없습니다.<br>
+                                파일이 실제로 폴더에 존재하지 않거나, CORS 제한 등 로컬 파일 보안 정책(또는 네트워크 차단)으로 인해 읽기가 실패했습니다.
+                            </div>
+                            <button class="intro-btn" onclick="window.location.href='home.html'" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; font-weight: 800; padding: 0.8rem 1.8rem; border-radius: 0.75rem; cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); transition: all 0.2s;">
+                                홈으로 돌아가기
+                            </button>
+                        </div>
+                    `;
                 }
             }
         }
+        window.initViewerFromData = initViewerFromData;
 
-        // [동적 바인딩] DOMContentLoaded 시점에 data.json 자동 로딩을 제거하고 수동 로드 배너 상시 표출
+        // [동적 바인딩] DOMContentLoaded 시점에 주소창 파라미터가 수신되면 즉시 상영 시작
         window.addEventListener('DOMContentLoaded', () => {
-            showLocalServerGuide();
+            const urlParams = new URLSearchParams(window.location.search);
+            const fileParam = urlParams.get('file');
+            if (fileParam) {
+                initViewerFromData(fileParam);
+            } else {
+                initViewerFromData('data.json');
+            }
         });
 
         // viewer DOM 동적 빌더 (플레이스홀더만 생성하여 Lazy Rendering 보장)

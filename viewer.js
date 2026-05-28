@@ -1,4 +1,4 @@
-﻿// =========================================================================
+// =========================================================================
 // ?렗 ?뱁댆 ?쒕꽕留덊떛 酉곗뼱 怨듯넻 ?곗텧 諛??ъ슫???듭떖 ?붿쭊 紐⑤뱢 (viewer.js)
 // =========================================================================
 
@@ -1500,20 +1500,7 @@ function normalizeAndMapProjectData(data) {
         });
     }
 
-    // 3. ?뺢퇋???뚯씠?꾨씪???섑뻾 ??諛섑솚
-    if (mappedData.cuts) {
-        mappedData.cuts.unshift({
-            id: "cut_dummy_init",
-            index: 0,
-            layer1: null,
-            layer2: null,
-            layer3: null,
-            bgImage: null,
-            bgImageName: null,
-            effectType: "none",
-            items: []
-        });
-    }
+    // 3. 정규화 파이프라인 수행 후 반환
     return normalizeProjectDataPaths(mappedData);
 }
 

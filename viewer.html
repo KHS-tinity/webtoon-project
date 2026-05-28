@@ -53,71 +53,41 @@
 
         body {
             font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-            background: linear-gradient(135deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            background-color: #090d16;
             color: #f8fafc;
             margin: 0;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             min-height: 100vh;
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
         }
 
-        /* 입체감 있는 외곽 광채 모바일 프레임 */
+        /* 깔끔한 반응형 웹툰 뷰어 프레임 */
         .viewport-wrapper {
             position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
-        }
-
-        .device-glow {
-            position: absolute;
-            top: -20px; left: -20px; right: -20px; bottom: -20px;
-            background: radial-gradient(circle, var(--glow-color) 0%, transparent 70%);
-            z-index: -1;
-            border-radius: 3.5rem;
-            filter: blur(15px);
-            pointer-events: none;
+            width: 100%;
+            height: 100vh;
         }
 
         .mobile-frame {
-            width: 360px;
-            height: 740px;
-            background-color: #1e293b;
-            border-radius: 3rem;
-            box-shadow: 
-                0 0 0 12px #1e293b, 
-                0 25px 50px -12px rgba(0, 0, 0, 0.5),
-                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            width: 100%;
+            max-width: 720px;
+            height: 100vh;
+            background-color: #090d16;
             position: relative;
             overflow: hidden;
-            border: 2px solid rgba(255, 255, 255, 0.08);
-        }
-
-        /* 아이폰 스타일 상단 아일랜드 노치 */
-        .mobile-frame::before {
-            content: '';
-            position: absolute;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 110px;
-            height: 28px;
-            background-color: #0f172a;
-            border-radius: 14px;
-            z-index: 100;
-            pointer-events: none;
-            box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
         }
 
         /* 런타임 스냅 스크롤 캔버스 */
         .viewer-scroll-container {
+            flex: 1;
             width: 100%;
-            height: 100%;
             overflow-y: scroll;
             scroll-snap-type: y mandatory;
             scroll-behavior: smooth;
@@ -394,27 +364,18 @@
             letter-spacing: 0.05em;
         }
 
-        /* 하단 오토플레이 안내 플로터 */
+        /* 상단 고정 칸 내의 오토플레이 안내 상태 표시기 */
         .viewer-floater {
-            position: absolute;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.68rem;
             font-weight: 700;
             color: #94a3b8;
-            z-index: 100;
             display: flex;
             align-items: center;
-            gap: 0.35rem;
+            gap: 0.3rem;
             pointer-events: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
 
         .floater-dot {
@@ -430,47 +391,111 @@
             50% { opacity: 1; }
         }
 
-        /* 프리미엄 BGM 토글 버튼 스타일 */
-        .bgm-toggle-btn {
-            position: absolute;
-            top: 52px;
-            left: 20px;
-            width: 38px;
-            height: 38px;
-            background: rgba(15, 23, 42, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 50%;
+        .nav-center-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* 최상단 고정 네비게이션 바 */
+        .viewer-top-nav {
+            width: 100%;
+            height: 76px;
+            background: rgba(9, 13, 22, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            z-index: 500;
             display: flex;
             align-items: center;
-            justify-content: center;
-            color: #ffffff;
-            font-size: 1.1rem;
+            justify-content: space-between;
+            padding: 0 1rem;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            font-size: 0.82rem;
+            font-weight: 700;
             cursor: pointer;
-            z-index: 450;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
         }
-        .bgm-toggle-btn:hover {
-            transform: scale(1.08);
-            background: rgba(15, 23, 42, 0.85);
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
             border-color: rgba(99, 102, 241, 0.4);
-            box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+            color: #ffffff;
         }
-        .bgm-toggle-btn.muted {
-            border-color: rgba(239, 68, 68, 0.4);
-            box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
+
+        .nav-btn:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+
+        .nav-episode-control {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-chapter-title {
+            font-size: 0.88rem;
+            font-weight: 800;
+            color: #ffffff;
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .nav-btn.btn-bgm {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+            min-width: 70px;
+            justify-content: center;
+        }
+
+        .nav-btn.btn-bgm.muted {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
         }
     </style>
 </head>
 <body>
 
     <div class="viewport-wrapper">
-        <div class="device-glow"></div>
         <div class="mobile-frame" id="mobileFrame">
-            <!-- 배경음악 끄기 버튼 (FAB) -->
-            <button class="bgm-toggle-btn" id="bgmToggleBtn" title="배경음악 켜기/끄기">🎵</button>
+            <!-- 최상단 고정 네비게이션 바 -->
+            <div class="viewer-top-nav" id="viewerTopNav">
+                <button class="nav-btn btn-back" id="navBackBtn" onclick="window.location.href='home.html'">
+                    <span>🏠 목록</span>
+                </button>
+                <div class="nav-center-group">
+                    <div class="nav-episode-control">
+                        <button class="nav-btn btn-prev" id="navPrevBtn" disabled>◀ 이전</button>
+                        <span class="nav-chapter-title" id="navChapterTitle">로딩 중...</span>
+                        <button class="nav-btn btn-next" id="navNextBtn" disabled>다음 ▶</button>
+                    </div>
+                    <!-- 상단 고정 칸 내의 오토플레이 안내 상태 표시기 -->
+                    <div class="viewer-floater" id="viewerFloater">
+                        <div class="floater-dot"></div>
+                        <span>스크롤 또는 Hold 시 빨리 감기</span>
+                    </div>
+                </div>
+                <button class="nav-btn btn-bgm" id="navBgmBtn" title="배경음악 켜기/끄기">🎵 ON</button>
+            </div>
             
             <!-- 오디오 자동 차단 해제 카드 안내 레이어 -->
             <div class="intro-overlay" id="introOverlay">
@@ -481,12 +506,6 @@
                     <div class="intro-desc">본 작품은 대사별 성우 보이스, 60fps 연출 효과 및 장면 배경음악(BGM)이 내장되어 있습니다. 터치하여 연출을 시작해 주세요.</div>
                     <button class="intro-btn">감상 시작하기</button>
                 </div>
-            </div>
-
-            <!-- 하단 안내 플로터 -->
-            <div class="viewer-floater">
-                <div class="floater-dot"></div>
-                <span>스크롤 또는 Hold 시 빨리 감기</span>
             </div>
 
             <!-- 독립 실행형 런타임 뷰어 스냅 스크롤 컨테이너 -->
@@ -501,6 +520,109 @@
     <script src="viewer.js"></script>
     
     <script>
+        // 깃허브 도메인 및 리포지토리 동적 식별용 설정
+        const isGitHubPages = location.hostname.endsWith('github.io');
+        let githubUser = 'KHS-tinity';
+        let githubRepo = 'webtoon-project';
+
+        if (isGitHubPages) {
+            const parts = location.hostname.split('.');
+            githubUser = parts[0];
+            const pathParts = location.pathname.split('/');
+            if (pathParts.length > 1 && pathParts[1] !== "") {
+                githubRepo = pathParts[1];
+            }
+        }
+
+        // 깃허브 및 로컬 폴더에서 JSON 파일 동적 검색 함수 (3중 레이어 스캔)
+        async function scanEpisodeFiles() {
+            const filenamePattern = /^.+_\d+화\.json$/i;
+
+            // 1순위: 로컬 웹 서버 API 스캔 시도
+            try {
+                const res = await fetch(`/api/episodes?t=${Date.now()}`);
+                if (res.ok) {
+                    const localFiles = await res.json();
+                    if (Array.isArray(localFiles) && localFiles.length > 0) {
+                        return localFiles
+                            .filter(name => filenamePattern.test(name))
+                            .map(name => ({ name: name, url: name }));
+                    }
+                }
+            } catch (err) {
+                console.log("[Dynamic Scan] 로컬 API 사용 불가능:", err);
+            }
+
+            // 2순위: GitHub Contents API 스캔 시도
+            try {
+                const apiUrl = `https://api.github.com/repos/${githubUser}/${githubRepo}/contents/`;
+                const res = await fetch(apiUrl);
+                if (res.ok) {
+                    const files = await res.json();
+                    if (Array.isArray(files)) {
+                        return files
+                            .filter(f => f.type === 'file' && filenamePattern.test(f.name))
+                            .map(f => ({ name: f.name, url: f.download_url }));
+                    }
+                }
+            } catch (err) {
+                console.warn("[Dynamic Scan] GitHub API 조회 실패:", err);
+            }
+
+            return [];
+        }
+
+        async function setupPagination(currentFileUrlOrName) {
+            let currentFilename = decodeURIComponent(currentFileUrlOrName);
+            if (currentFilename.includes('/')) {
+                currentFilename = currentFilename.split('/').pop().split('?')[0];
+            }
+            
+            console.log("[Pagination] Current Filename:", currentFilename);
+            
+            const episodes = await scanEpisodeFiles();
+            if (episodes.length === 0) return;
+            
+            episodes.forEach(ep => {
+                const match = ep.name.match(/_(\d+)화/);
+                ep.chapter = match ? parseInt(match[1]) : 1;
+            });
+            episodes.sort((a, b) => a.chapter - b.chapter);
+            
+            const currentIndex = episodes.findIndex(ep => {
+                let name = ep.name;
+                if (name.includes('/')) name = name.split('/').pop().split('?')[0];
+                return name === currentFilename;
+            });
+            
+            console.log("[Pagination] Episodes list:", episodes, "Current Index:", currentIndex);
+            
+            const prevBtn = document.getElementById('navPrevBtn');
+            const nextBtn = document.getElementById('navNextBtn');
+            
+            if (currentIndex > 0) {
+                const prevEp = episodes[currentIndex - 1];
+                prevBtn.disabled = false;
+                prevBtn.onclick = () => {
+                    sessionStorage.setItem('allowViewerEntry', 'true');
+                    window.location.href = `viewer.html?file=${encodeURIComponent(prevEp.url)}`;
+                };
+            } else {
+                prevBtn.disabled = true;
+            }
+            
+            if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
+                const nextEp = episodes[currentIndex + 1];
+                nextBtn.disabled = false;
+                nextBtn.onclick = () => {
+                    sessionStorage.setItem('allowViewerEntry', 'true');
+                    window.location.href = `viewer.html?file=${encodeURIComponent(nextEp.url)}`;
+                };
+            } else {
+                nextBtn.disabled = true;
+            }
+        }
+
         // 전역 상태 캐싱 (viewer.js 내부 상태와 일치)
         var cutsData = window.cutsData = window.cutsData || [];
         var activeBgms = window.activeBgms = window.activeBgms || {}; 
@@ -572,14 +694,14 @@
         // 배경음악 음소거 상태 제어 변수
         window.isBgmVolumeMuted = false;
         
-        const bgmToggleBtn = document.getElementById('bgmToggleBtn');
+        const bgmToggleBtn = document.getElementById('navBgmBtn');
         if (bgmToggleBtn) {
             bgmToggleBtn.addEventListener('click', (e) => {
                 e.stopPropagation(); // 상위 스크롤 락 및 터치 간섭 완전 차단
                 window.isBgmVolumeMuted = !window.isBgmVolumeMuted;
                 
                 bgmToggleBtn.classList.toggle('muted', window.isBgmVolumeMuted);
-                bgmToggleBtn.innerHTML = window.isBgmVolumeMuted ? "🔇" : "🎵";
+                bgmToggleBtn.innerHTML = window.isBgmVolumeMuted ? "🔇 OFF" : "🎵 ON";
                 
                 // 오디오 콘텍스트의 gainNode를 감쇄/복구 (Web Audio API 대응)
                 if (window.audioPipeManager) {
@@ -757,6 +879,15 @@
                 // DOM 빌딩
                 initializeViewer(normalizedData);
                 
+                // 최상단 타이틀 업데이트
+                const navTitle = document.getElementById('navChapterTitle');
+                if (navTitle) {
+                    navTitle.textContent = normalizedData.chapterTitle || (normalizedData.chapter + '화');
+                }
+                
+                // 회차 페이징 설정 가동
+                setupPagination(dataPath);
+                
                 // 기동 샌드박스: 로드 직후 0.05초 이내 첫 번째 컷을 강제 selectCut 안착 및 첫 컷 연출 즉시 가동
                 // 기동 샌드박스: 가상 0번 더미 컷으로 즉시 킥스타트 후, 0.1초 뒤 1번 컷으로 매끄럽게 전이
                 if (cutsData.length > 0) {
@@ -776,9 +907,13 @@
             } catch (err) {
                 console.error("에피소드 파일 로딩 실패:", err);
                 
-                // BGM 버튼 및 플로터 숨김
-                const bgmBtn = document.getElementById('bgmToggleBtn');
+                // BGM 버튼 및 페이징 버튼 숨김
+                const bgmBtn = document.getElementById('navBgmBtn');
                 if (bgmBtn) bgmBtn.style.display = 'none';
+                const prevBtn = document.getElementById('navPrevBtn');
+                if (prevBtn) prevBtn.style.display = 'none';
+                const nextBtn = document.getElementById('navNextBtn');
+                if (nextBtn) nextBtn.style.display = 'none';
                 const floater = document.querySelector('.viewer-floater');
                 if (floater) floater.style.display = 'none';
                 

@@ -486,6 +486,7 @@
                     <div class="nav-episode-control">
                         <button class="nav-btn btn-prev" id="navPrevBtn" disabled>◀ 이전</button>
                         <span class="nav-chapter-title" id="navChapterTitle">로딩 중...</span>
+                        <span class="nav-cut-counter" id="navCutCounter" style="font-size: 0.72rem; color: #818cf8; font-weight: 800; background: rgba(99, 102, 241, 0.12); padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.2); margin-left: 0.2rem; flex-shrink: 0; min-width: 32px; text-align: center;">- / -</span>
                         <button class="nav-btn btn-next" id="navNextBtn" disabled>다음 ▶</button>
                     </div>
                     <!-- 상단 고정 칸 내의 오토플레이 안내 상태 표시기 -->
@@ -861,6 +862,7 @@
                             });
                         }
                     });
+                    updateCutCounter();
                 }, 100);
             }
         }
@@ -1251,6 +1253,22 @@
             }
         }
 
+        function updateCutCounter() {
+            const counterSpan = document.getElementById('navCutCounter');
+            if (!counterSpan || !window.cutsData || window.cutsData.length === 0) return;
+            
+            const containerHeight = viewerScrollContainer.clientHeight || 740;
+            const scrollTop = viewerScrollContainer.scrollTop;
+            const currentCutIdx = Math.round(scrollTop / containerHeight);
+            
+            const totalActual = window.cutsData.length - 1;
+            let displayIdx = currentCutIdx;
+            if (displayIdx < 1) displayIdx = 1;
+            if (displayIdx > totalActual) displayIdx = totalActual;
+            
+            counterSpan.textContent = `${displayIdx} / ${totalActual}`;
+        }
+
         // 뷰어 스크롤 감지 및 제어 연동
         viewerScrollContainer.addEventListener('scroll', () => {
             if (cutsData.length === 0) return;
@@ -1327,6 +1345,8 @@
             if (typeof window.handleScrollUpdate === 'function') {
                 window.handleScrollUpdate();
             }
+            
+            updateCutCounter();
         });
 
         // 물리 인터랙션 발생 시 자동 재생 중지

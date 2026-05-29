@@ -1,0 +1,111 @@
+{
+  "version": "2.0",
+  "projectTitle": "퇴마영웅전",
+  "thumbnail": "자료/썸네일.png",
+  "chapter": 2,
+  "chapterTitle": "1",
+  "bgms": [
+    {
+      "id": "item_4",
+      "name": "메인 브금",
+      "audioUrl": "대항해시대2 Ost - Menu Theme(AI).mp3",
+      "startCut": 1,
+      "endCut": 1,
+      "startTime": 0
+    }
+  ],
+  "cuts": [
+    {
+      "id": "cut_0",
+      "index": 1,
+      "layer1": null,
+      "layer2": null,
+      "layer3": {
+        "url": "11.jpg",
+        "name": "11.jpg",
+        "type": "image"
+      },
+      "bgImage": "11.jpg",
+      "bgImageName": "11.jpg",
+      "effectType": "none",
+      "items": [
+        {
+          "id": "item_0",
+          "type": "dialogue",
+          "charName": "주인공",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 0.5,
+          "duration": 1.5,
+          "x": 15,
+          "y": 20,
+          "baseAngle": 300.2,
+          "tipDx": 66.7,
+          "tipDy": -74.6,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_1",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "다중 컷 편집기 가동 시작!",
+          "audioUrl": "",
+          "start": 2.2,
+          "duration": 2,
+          "x": 10,
+          "y": 40,
+          "baseAngle": 118.9,
+          "tipDx": -39.5,
+          "tipDy": 43.6,
+          "baseWidth": 14
+        }
+      ]
+    },
+    {
+      "id": "cut_1",
+      "index": 2,
+      "layer1": null,
+      "layer2": null,
+      "layer3": null,
+      "bgImage": null,
+      "bgImageName": null,
+      "effectType": "none",
+      "items": [
+        {
+          "id": "item_2",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "",
+          "audioUrl": "",
+          "start": 0.5,
+          "duration": 2,
+          "x": 10,
+          "y": 20,
+          "baseAngle": 45,
+          "tipDx": 55.2,
+          "tipDy": 78.6,
+          "baseWidth": 14
+        },
+        {
+          "id": "item_3",
+          "type": "dialogue",
+          "charName": "캐릭터",
+          "charColor": "#ffffff",
+          "text": "",
+          "audioUrl": "",
+          "start": 2.9,
+          "duration": 2,
+          "x": 48.2,
+          "y": 58.4,
+          "baseAngle": 251,
+          "tipDx": -66.7,
+          "tipDy": -57.2,
+          "baseWidth": 14
+        }
+      ]
+    }
+  ]
+}

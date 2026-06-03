@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <script>
+        // 외부 직접 진입 차단 프록시 가드 (보안장치)
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fileParam = urlParams.get('file');
+            
+            // 로컬 개발 환경에서의 새로고침을 배려하기 위해 sessionStorage와 referrer를 둘 다 체크합니다.
+            const referrer = document.referrer || "";
+            const isFromHome = referrer.indexOf('home.html') !== -1 || sessionStorage.getItem('allowViewerEntry') === 'true';
+            
+            // 만약 파일 파라미터가 지정되어 있으나, 정상 진입 경로(home.html)가 아니거나 진입 세션키가 없다면 차단 및 튕겨내기
+            if (fileParam && !isFromHome) {
+                console.warn("[Entry Blocked] Redirecting to home.html");
+                window.location.replace('home.html');
+            }
+        })();
+
+        window.addEventListener('error', function(e) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '0';
+            errorDiv.style.left = '0';
+            errorDiv.style.width = '100%';
+            errorDiv.style.backgroundColor = '#ef4444';
+            errorDiv.style.color = '#ffffff';
+            errorDiv.style.padding = '1rem';
+            errorDiv.style.zIndex = '999999';
+            errorDiv.style.fontSize = '14px';
+            errorDiv.style.fontFamily = 'monospace';
+            errorDiv.style.whiteSpace = 'pre-wrap';
+            errorDiv.innerHTML = '<strong>[JS Runtime Error]</strong> ' + e.message + '<br>Line: ' + e.lineno + ' | Col: ' + e.colno + '<br>File: ' + e.filename + (e.error && e.error.stack ? '<br><br>' + e.error.stack.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : '');
+            document.body.appendChild(errorDiv);
+        });
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>시네마틱 웹툰 사운드 뷰어 Runtime</title>
+    <!-- Google Fonts & Pretendard CDN -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient-start: #0f172a;
+            --bg-gradient-end: #020617;
+            --device-bg: #1e293b;
+            --glow-color: rgba(99, 102, 241, 0.15);
+            --bubble-text-color: #111827;
+            --accent-color: #6366f1;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 깔끔한 반응형 웹툰 뷰어 프레임 */
+        .viewport-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            height: 100vh;
+        }
+
+        .mobile-frame {
+            width: 100%;
+            max-width: 720px;
+            height: 100vh;
+            background-color: #090d16;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 런타임 스냅 스크롤 캔버스 */
+        .viewer-scroll-container {
+            flex: 1;
+            width: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            background-color: #090d16;
+        }
+        .viewer-scroll-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .viewer-cut-item {
+            width: 100%;
+            height: 100%;
+            flex-shrink: 0;
+            position: relative;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+            overflow: hidden;
+            background-color: #0f172a;
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
+            transition: transform 0.5s ease;
+        }
+
+        .cut-bg-image, .cut-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            pointer-events: none;
+            object-fit: cover; /* WebM 비디오 자동 비율 크기 채우기 대응 */
+        }
+
+        .cut-bg-image {
+            z-index: 1;
+        }
+
+        /* 60fps GPU 가속 연출 필터 및 트랜지션 정의 */
+        .cut-bg-image.effect-fade, .cut-layer.effect-fade {
+            opacity: 0;
+            transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-fade,
+        .viewer-cut-item.active .cut-layer.effect-fade {
+            opacity: 1;
+        }
+
+        .cut-bg-image.effect-slide-up, .cut-layer.effect-slide-up {
+            transform: translateY(120px);
+            opacity: 0;
+            transition: transform 0.9s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.8s ease;
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-slide-up,
+        .viewer-cut-item.active .cut-layer.effect-slide-up {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .cut-bg-image.effect-zoom, .cut-layer.effect-zoom {
+            transform: scale(1.35);
+            opacity: 0;
+            transition: transform 1.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 1s ease;
+        }
+        .viewer-cut-item.active .cut-bg-image.effect-zoom,
+        .viewer-cut-item.active .cut-layer.effect-zoom {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .viewer-cut-item.effect-shake.active {
+            animation: viewerShake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+
+        @keyframes viewerShake {
+            10%, 90% { transform: translate3d(-4px, -3px, 0); }
+            20%, 80% { transform: translate3d(6px, 5px, 0); }
+            30%, 50%, 70% { transform: translate3d(-11px, 3px, 0); }
+            40%, 60% { transform: translate3d(11px, -5px, 0); }
+        }
+
+        /* 말풍선 공통 스타일 */
+        .bubble-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .speech-bubble {
+            position: absolute;
+            max-width: 75%;
+            padding: 0.9rem 1.35rem;
+            border-radius: 1.35rem;
+            font-size: 1.05rem;
+            font-weight: 700;
+            line-height: 1.5;
+            word-break: keep-all;
+            transform: scale(0.6) translateY(20px);
+            opacity: 0;
+            z-index: 10;
+            color: var(--bubble-text-color);
+            background-color: transparent;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+        }
+
+        .bubble-text-layer {
+            position: relative;
+            z-index: 10;
+            pointer-events: none;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .bubble-shadow-layer {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: inherit;
+            z-index: -2;
+            pointer-events: none;
+        }
+
+        .speech-bubble.animate {
+            opacity: 0;
+            transform: scale(0.6) translateY(20px);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease, left 0.3s ease, top 0.3s ease;
+        }
+
+        .speech-bubble.animate .tail-svg,
+        .speech-bubble.animate .bubble-path {
+            opacity: 0;
+            transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .speech-bubble.show {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        .speech-bubble.show .tail-svg,
+        .speech-bubble.show .bubble-path {
+            opacity: 1;
+        }
+
+        .typing-wrapper span {
+            opacity: 0;
+            display: inline;
+        }
+
+        .tail-svg {
+            position: absolute;
+            top: -500px;
+            left: -500px;
+            width: 1000px;
+            height: 1000px;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .bubble-bg-cover {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: inherit;
+            background-color: var(--bubble-color, #ffffff);
+            border: 2.5px solid #111827;
+            box-sizing: border-box;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* 글래스모피즘 오디오 락 해제 안내 인트로 레이어 */
+        .intro-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .intro-card {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 2.2rem 1.8rem;
+            border-radius: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            max-width: 290px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform: scale(0.95);
+            animation: cardEntrance 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes cardEntrance {
+            to { transform: scale(1); }
+        }
+
+        .intro-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.4));
+            animation: pulseGlow 2s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.08); }
+        }
+
+        .intro-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .intro-desc {
+            font-size: 0.88rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+            word-break: keep-all;
+        }
+
+        .intro-btn {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.6rem;
+            border-radius: 1rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .intro-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(99, 102, 241, 0.5);
+        }
+
+        .intro-badge {
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #6366f1;
+            background: rgba(99, 102, 241, 0.15);
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            margin-bottom: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* 상단 고정 칸 내의 오토플레이 안내 상태 표시기 */
+        .viewer-floater {
+            background: rgba(255, 255, 255, 0.04);
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            pointer-events: none;
+        }
+
+        .floater-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            animation: blink 1.2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        .nav-center-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* 최상단 고정 네비게이션 바 */
+        .viewer-top-nav {
+            width: 100%;
+            height: 76px;
+            background: rgba(9, 13, 22, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1rem;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(99, 102, 241, 0.4);
+            color: #ffffff;
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+
+        .nav-episode-control {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-chapter-title {
+            font-size: 0.88rem;
+            font-weight: 800;
+            color: #ffffff;
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        .nav-btn.btn-bgm {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+            min-width: 70px;
+            justify-content: center;
+        }
+
+        .nav-btn.btn-bgm.muted {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="viewport-wrapper">
+        <div class="mobile-frame" id="mobileFrame">
+            <!-- 최상단 고정 네비게이션 바 -->
+            <div class="viewer-top-nav" id="viewerTopNav">
+                <button class="nav-btn btn-back" id="navBackBtn" onclick="window.location.href='home.html'">
+                    <span>🏠 목록</span>
+                </button>
+                <div class="nav-center-group">
+                    <div class="nav-episode-control">
+                        <button class="nav-btn btn-prev" id="navPrevBtn" disabled>◀ 이전</button>
+                        <span class="nav-chapter-title" id="navChapterTitle">로딩 중...</span>
+                        <span class="nav-cut-counter" id="navCutCounter" style="font-size: 0.72rem; color: #818cf8; font-weight: 800; background: rgba(99, 102, 241, 0.12); padding: 0.15rem 0.45rem; border-radius: 4px; border: 1px solid rgba(99, 102, 241, 0.2); margin-left: 0.2rem; flex-shrink: 0; min-width: 32px; text-align: center;">- / -</span>
+                        <button class="nav-btn btn-next" id="navNextBtn" disabled>다음 ▶</button>
+                    </div>
+                    <!-- 상단 고정 칸 내의 오토플레이 안내 상태 표시기 -->
+                    <div class="viewer-floater" id="viewerFloater">
+                        <div class="floater-dot"></div>
+                        <span>스크롤 또는 Hold 시 빨리 감기</span>
+                    </div>
+                </div>
+                <button class="nav-btn btn-bgm" id="navBgmBtn" title="배경음악 켜기/끄기">🎵 ON</button>
+            </div>
+            
+            <!-- 오디오 자동 차단 해제 카드 안내 레이어 -->
+            <div class="intro-overlay" id="introOverlay">
+                <div class="intro-card">
+                    <div class="intro-badge">Sound & Motion</div>
+                    <div class="intro-icon">🎬</div>
+                    <div class="intro-title">Cinematic Director</div>
+                    <div class="intro-desc">본 작품은 대사별 성우 보이스, 60fps 연출 효과 및 장면 배경음악(BGM)이 내장되어 있습니다. 터치하여 연출을 시작해 주세요.</div>
+                    <button class="intro-btn">감상 시작하기</button>
+                </div>
+            </div>
+
+            <!-- 독립 실행형 런타임 뷰어 스냅 스크롤 컨테이너 -->
+            <div class="viewer-scroll-container" id="viewerScrollContainer">
+                <!-- data.json 연동을 통해 동적으로 cuts 로드 및 렌더링 -->
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 🎬 공통 뷰어 사운드/연출 핵심 엔진 주입 -->
+    <script src="viewer.js"></script>
+    
+    <script>
+        // 깃허브 도메인 및 리포지토리 동적 식별용 설정
+        const isGitHubPages = location.hostname.endsWith('github.io');
+        let githubUser = 'KHS-tinity';
+        let githubRepo = 'webtoon-project';
+
+        if (isGitHubPages) {
+            const parts = location.hostname.split('.');
+            githubUser = parts[0];
+            const pathParts = location.pathname.split('/');
+            if (pathParts.length > 1 && pathParts[1] !== "") {
+                githubRepo = pathParts[1];
+            }
+        }
+
+        // 깃허브 및 로컬 폴더에서 JSON 파일 동적 검색 함수 (3중 레이어 스캔)
+        async function scanEpisodeFiles() {
+            const filenamePattern = /^.+_\d+화\.json$/i;
+
+            // 1순위: 로컬 웹 서버 API 스캔 시도
+            try {
+                const res = await fetch(`/api/episodes?t=${Date.now()}`);
+                if (res.ok) {
+                    const localFiles = await res.json();
+                    if (Array.isArray(localFiles) && localFiles.length > 0) {
+                        return localFiles
+                            .filter(name => filenamePattern.test(name))
+                            .map(name => ({ name: name, url: name }));
+                    }
+                }
+            } catch (err) {
+                console.log("[Dynamic Scan] 로컬 API 사용 불가능:", err);
+            }
+
+            // 2순위: GitHub Contents API 스캔 시도
+            try {
+                const apiUrl = `https://api.github.com/repos/${githubUser}/${githubRepo}/contents/`;
+                const res = await fetch(apiUrl);
+                if (res.ok) {
+                    const files = await res.json();
+                    if (Array.isArray(files)) {
+                        return files
+                            .filter(f => f.type === 'file' && filenamePattern.test(f.name))
+                            .map(f => ({ name: f.name, url: f.download_url }));
+                    }
+                }
+            } catch (err) {
+                console.warn("[Dynamic Scan] GitHub API 조회 실패:", err);
+            }
+
+            return [];
+        }
+
+        async function setupPagination(currentFileUrlOrName) {
+            let currentFilename = decodeURIComponent(currentFileUrlOrName);
+            if (currentFilename.includes('/')) {
+                currentFilename = currentFilename.split('/').pop().split('?')[0];
+            }
+            
+            console.log("[Pagination] Current Filename:", currentFilename);
+            
+            const episodes = await scanEpisodeFiles();
+            if (episodes.length === 0) return;
+            
+            episodes.forEach(ep => {
+                const match = ep.name.match(/_(\d+)화/);
+                ep.chapter = match ? parseInt(match[1]) : 1;
+            });
+            episodes.sort((a, b) => a.chapter - b.chapter);
+            
+            const currentIndex = episodes.findIndex(ep => {
+                let name = ep.name;
+                if (name.includes('/')) name = name.split('/').pop().split('?')[0];
+                return name === currentFilename;
+            });
+            
+            console.log("[Pagination] Episodes list:", episodes, "Current Index:", currentIndex);
+            
+            const prevBtn = document.getElementById('navPrevBtn');
+            const nextBtn = document.getElementById('navNextBtn');
+            
+            if (currentIndex > 0) {
+                const prevEp = episodes[currentIndex - 1];
+                prevBtn.disabled = false;
+                prevBtn.onclick = () => {
+                    sessionStorage.setItem('allowViewerEntry', 'true');
+                    window.location.href = `viewer.html?file=${encodeURIComponent(prevEp.url)}`;
+                };
+            } else {
+                prevBtn.disabled = true;
+            }
+            
+            if (currentIndex !== -1 && currentIndex < episodes.length - 1) {
+                const nextEp = episodes[currentIndex + 1];
+                nextBtn.disabled = false;
+                nextBtn.onclick = () => {
+                    sessionStorage.setItem('allowViewerEntry', 'true');
+                    window.location.href = `viewer.html?file=${encodeURIComponent(nextEp.url)}`;
+                };
+            } else {
+                nextBtn.disabled = true;
+            }
+        }
+
+        // 전역 상태 캐싱 (viewer.js 내부 상태와 일치)
+        var cutsData = window.cutsData = window.cutsData || [];
+        var activeBgms = window.activeBgms = window.activeBgms || {}; 
+        var isWebAudioInitialized = window.isWebAudioInitialized = window.isWebAudioInitialized || false;
+        var isAutoplayPending = window.isAutoplayPending = window.isAutoplayPending !== undefined ? window.isAutoplayPending : true;
+
+        var viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
+        var introOverlay = window.introOverlay = document.getElementById('introOverlay');
+
+        // 수려한 프리미엄 스키마 버전 매칭 토스트 알림창
+        function showVersionNotification(version) {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: absolute;
+                top: 55px;
+                left: 50%;
+                transform: translateX(-50%) translateY(-20px);
+                background: rgba(15, 23, 42, 0.9);
+                border: 1px solid ${version === "2.0" ? "rgba(99, 102, 241, 0.4)" : "rgba(245, 158, 11, 0.4)"};
+                color: #ffffff;
+                padding: 0.6rem 1.2rem;
+                border-radius: 1rem;
+                font-size: 0.75rem;
+                font-weight: 800;
+                z-index: 9999;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                opacity: 0;
+                transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            `;
+            
+            const dot = document.createElement('div');
+            dot.style.cssText = `
+                width: 7px;
+                height: 7px;
+                background-color: ${version === "2.0" ? "#6366f1" : "#f59e0b"};
+                border-radius: 50%;
+                box-shadow: 0 0 8px ${version === "2.0" ? "#6366f1" : "#f59e0b"};
+            `;
+            
+            const text = document.createElement('span');
+            text.textContent = version === "2.0" 
+                ? `Director V2.0 작품 로드 완료` 
+                : `Legacy V1.0 작품 호환 로드 완료`;
+                
+            toast.appendChild(dot);
+            toast.appendChild(text);
+            
+            const mobileFrame = document.getElementById('mobileFrame');
+            if (mobileFrame) {
+                mobileFrame.appendChild(toast);
+                requestAnimationFrame(() => {
+                    toast.style.opacity = '1';
+                    toast.style.transform = 'translateX(-50%) translateY(0)';
+                });
+                
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(-50%) translateY(-10px)';
+                    setTimeout(() => toast.remove(), 400);
+                }, 2500);
+            }
+        }
+
+        // 배경음악 음소거 상태 제어 변수
+        window.isBgmVolumeMuted = false;
+        
+        const bgmToggleBtn = document.getElementById('navBgmBtn');
+        if (bgmToggleBtn) {
+            bgmToggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 상위 스크롤 락 및 터치 간섭 완전 차단
+                window.isBgmVolumeMuted = !window.isBgmVolumeMuted;
+                
+                bgmToggleBtn.classList.toggle('muted', window.isBgmVolumeMuted);
+                bgmToggleBtn.innerHTML = window.isBgmVolumeMuted ? "🔇 OFF" : "🎵 ON";
+                
+                // 오디오 콘텍스트의 gainNode를 감쇄/복구 (Web Audio API 대응)
+                if (window.audioPipeManager) {
+                    window.audioPipeManager.init();
+                    if (window.audioPipeManager.bgmMasterGain && window.audioPipeManager.ctx) {
+                        const now = window.audioPipeManager.ctx.currentTime;
+                        const targetGain = window.isBgmVolumeMuted ? 0.0 : 1.0;
+                        window.audioPipeManager.bgmMasterGain.gain.setTargetAtTime(targetGain, now, 0.1);
+                    }
+                }
+                
+                // BGM 60fps 더킹 감쇄를 즉각 강제하기 위해 viewer.js의 BGM 루프 상태에도 volume을 즉시 0/lerp 조율
+                if (window.activeBgms) {
+                    Object.values(window.activeBgms).forEach(track => {
+                        if (track.audio) {
+                            if (window.isBgmVolumeMuted) {
+                                track.audio.volume = 0;
+                            } else {
+                                track.audio.volume = 0.25;
+                            }
+                        }
+                    });
+                }
+                
+                console.log(`[BGM Mute Mode Toggle] Muted: ${window.isBgmVolumeMuted}`);
+            });
+        }
+
+        // 고해상도 말풍선 둥근 SVG 및 꼬리표 물리 기하 실시간 관찰 엔진 (ResizeObserver)
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const bubble = entry.target.closest('.speech-bubble');
+                if (bubble) {
+                    const baseAngle = parseFloat(bubble.dataset.baseAngle) || 45;
+                    const tipDx = parseFloat(bubble.dataset.tipDx) || 30;
+                    const tipDy = parseFloat(bubble.dataset.tipDy) || 30;
+                    const baseWidth = parseFloat(bubble.dataset.baseWidth) || 14;
+                    updateTailRuntime(bubble, baseAngle, tipDx, tipDy, baseWidth);
+                }
+            }
+        });
+        window.resizeObserver = resizeObserver;
+
+        // 전체 초기화 래퍼 함수
+        // 뷰어 전용 selectCut 함수 정의
+        function selectCut(cutId, smoothScroll = true) {
+            try {
+                // 숫자로 들어오는 경우 인덱스 매핑 지원
+                if (typeof cutId === 'number') {
+                    if (cutsData && cutsData[cutId]) {
+                        cutId = cutsData[cutId].id;
+                    }
+                }
+
+                const targetItem = document.getElementById(`viewerCut_${cutId}`);
+                if (targetItem) {
+                    // 컷 변경 시마다 requestAnimationFrame을 사용하여 강제 Reflow 유도
+                    requestAnimationFrame(() => {
+                        void targetItem.offsetHeight;
+                        void viewerScrollContainer.offsetHeight;
+                    });
+
+                    if (smoothScroll && typeof animateScrollTo === 'function') {
+                        animateScrollTo(targetItem.offsetTop, 600, () => {
+                            window.lastSettledCutId = cutId;
+                            if (typeof window.handleScrollUpdate === 'function') {
+                                window.handleScrollUpdate();
+                            }
+                        });
+                    } else {
+                        window.isSyncScrolling = true;
+                        viewerScrollContainer.scrollTop = targetItem.offsetTop;
+                        window.lastSettledCutId = cutId;
+                        if (typeof window.handleScrollUpdate === 'function') {
+                            window.handleScrollUpdate();
+                        }
+                        setTimeout(() => {
+                            window.isSyncScrolling = false;
+                        }, 50);
+                    }
+                }
+                
+                // Canvas 강제 갱신용 updateCanvas 호출 (폴백 가드 적용)
+                if (typeof window.updateCanvas === 'function') {
+                    window.updateCanvas();
+                } else if (typeof updateCanvas === 'function') {
+                    updateCanvas();
+                }
+            } catch (err) {
+                console.error("[Viewer selectCut Error]", err);
+            }
+        }
+        window.selectCut = selectCut;
+
+        // 전체 초기화 래퍼 함수 (동기 DOM 빌드)
+        function initializeViewer(data) {
+            const version = data.version || "1.0";
+            console.log(`[Schema Version Check] Project Version: ${version}`);
+            
+            // 0. 스키마 버전 알림 가동
+            showVersionNotification(version);
+
+            cutsData = data.cuts || [];
+            
+            // 프리미엄 데이터 동기화: 기존 window.cuts 배열의 참조를 완벽히 유지하여 viewer.js 렉시컬 스코프 참조 락 방지
+            if (window.cuts && Array.isArray(window.cuts)) {
+                window.cuts.splice(0, window.cuts.length, ...cutsData);
+            } else {
+                window.cuts = cutsData;
+            }
+            
+            window.bgmsDataListGlobal = data.bgms || []; // 글로벌 BGM 데이터 캐시 동시 바인딩
+            
+            // 1. DOM 빌드
+            buildViewerDOM(data);
+            
+            // 2. 초기 1컷 바인딩 및 말꼬리 초기 드로잉 트리거
+            if (cutsData.length > 0) {
+                window.currentCutId = null; // null로 초기화하여 첫 컷 로드 시 전환을 정상 인식하도록 함
+                window.lastSettledCutId = null; // 오토플레이 안착 판정을 위해 최초에는 null로 비워둡니다.
+                
+                setTimeout(() => {
+                    cutsData.forEach(c => {
+                        if (c.items) {
+                            c.items.forEach(item => {
+                                if (item.type === 'dialogue') {
+                                    const bubble = document.getElementById(`bubble_${item.id}`);
+                                    if (bubble) {
+                                        updateTailRuntime(bubble, item.baseAngle, item.tipDx, item.tipDy, item.baseWidth);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    updateCutCounter();
+                }, 100);
+            }
+        }
+
+        // 비동기 프로젝트 로더 및 샌드박스 초기 안착 기동 함수
+        async function initViewerFromData(dataPath = 'data.json') {
+            try {
+                const res = await fetch(dataPath + (dataPath.includes('?') ? '&' : '?') + 't=' + Date.now());
+                if (!res.ok) throw new Error("데이터 로드 실패");
+                
+                const rawData = await res.json();
+                
+                // 데이터 어댑터 가동: 프로퍼티 스키마 매핑 및 리소스 상대 경로 일괄 정규화 완료
+                const normalizedData = window.normalizeAndMapProjectData(rawData);
+                
+                // DOM 빌딩
+                initializeViewer(normalizedData);
+                
+                // 최상단 타이틀 업데이트
+                const navTitle = document.getElementById('navChapterTitle');
+                if (navTitle) {
+                    navTitle.textContent = normalizedData.chapterTitle || (normalizedData.chapter + '화');
+                }
+                
+                // 회차 페이징 설정 가동
+                setupPagination(dataPath);
+                
+                // 기동 샌드박스: 로드 직후 첫 번째 실제 컷(index 0)으로 즉시 안착 및 연출 기동
+                if (cutsData.length > 0) {
+                    setTimeout(() => {
+                        window.lastSettledCutId = null; // lastSettledCutId를 명시적으로 비워서 안착 판단 유도
+                        selectCut(0, false); // 첫 번째 실제 컷(index 0) 기동
+                        if (typeof window.renderItemsFrame === 'function') {
+                            window.requestAnimationFrame(window.renderItemsFrame);
+                        }
+                    }, 50);
+                }
+                
+            } catch (err) {
+                console.error("에피소드 파일 로딩 실패:", err);
+                
+                // BGM 버튼 및 페이징 버튼 숨김
+                const bgmBtn = document.getElementById('navBgmBtn');
+                if (bgmBtn) bgmBtn.style.display = 'none';
+                const prevBtn = document.getElementById('navPrevBtn');
+                if (prevBtn) prevBtn.style.display = 'none';
+                const nextBtn = document.getElementById('navNextBtn');
+                if (nextBtn) nextBtn.style.display = 'none';
+                const floater = document.querySelector('.viewer-floater');
+                if (floater) floater.style.display = 'none';
+                
+                // introOverlay를 에러 메시지 카드로 교체
+                if (introOverlay) {
+                    introOverlay.style.display = 'flex';
+                    introOverlay.innerHTML = `
+                        <div class="intro-card" style="border: 2px solid #ef4444; box-shadow: 0 0 30px rgba(239, 68, 68, 0.25);">
+                            <div class="intro-badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; font-weight: 800;">Error</div>
+                            <div class="intro-icon" style="font-size: 3.5rem; margin: 1rem 0;">⚠️</div>
+                            <div class="intro-title" style="font-size: 1.6rem; font-weight: 800; color: #f8fafc;">에피소드 로드 실패</div>
+                            <div class="intro-desc" style="color: #cbd5e1; font-size: 0.9rem; line-height: 1.6; margin: 1rem 0; word-break: break-all;">
+                                에피소드 파일(<strong>${dataPath}</strong>)을 불러올 수 없습니다.<br>
+                                파일이 실제로 폴더에 존재하지 않거나, CORS 제한 등 로컬 파일 보안 정책(또는 네트워크 차단)으로 인해 읽기가 실패했습니다.
+                            </div>
+                            <button class="intro-btn" onclick="window.location.href='home.html'" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; font-weight: 800; padding: 0.8rem 1.8rem; border-radius: 0.75rem; cursor: pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); transition: all 0.2s;">
+                                홈으로 돌아가기
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        }
+        window.initViewerFromData = initViewerFromData;
+
+        // [동적 바인딩] DOMContentLoaded 시점에 주소창 파라미터가 수신되면 즉시 상영 시작
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const fileParam = urlParams.get('file');
+            if (fileParam) {
+                initViewerFromData(fileParam);
+            } else {
+                initViewerFromData('data.json');
+            }
+        });
+
+        // viewer DOM 동적 빌더 (플레이스홀더만 생성하여 Lazy Rendering 보장)
+        function buildViewerDOM(data) {
+            viewerScrollContainer.innerHTML = '';
+            
+            data.cuts.forEach((c, idx) => {
+                const cutItem = document.createElement('div');
+                cutItem.className = 'viewer-cut-item';
+                cutItem.id = `viewerCut_${c.id}`;
+                cutItem.dataset.cutId = c.id;
+                if (idx === 0) {
+                    cutItem.style.opacity = '0'; // 첫 컷 로딩 전까지 화면 숨김
+                }
+
+                // 말풍선 담을 버블 컨테이너
+                const bubbleContainer = document.createElement('div');
+                bubbleContainer.className = 'bubble-container';
+                bubbleContainer.id = `bubbleContainer_${c.id}`;
+                
+                cutItem.appendChild(bubbleContainer);
+                viewerScrollContainer.appendChild(cutItem);
+            });
+        }
+
+        // 명암 대비 색상 계산기 (Contrast YIQ)
+        function getContrastYIQ(hexcolor){
+            if(!hexcolor) return '#111827';
+            hexcolor = hexcolor.replace("#", "");
+            var r = parseInt(hexcolor.substr(0,2),16);
+            var g = parseInt(hexcolor.substr(2,2),16);
+            var b = parseInt(hexcolor.substr(4,2),16);
+            var yiq = ((r*299)+(g*587)+(b*114))/1000;
+            return (yiq >= 128) ? '#111827' : '#ffffff'; 
+        }
+
+        // [수학적 말꼬리 SVG 그리기] 둥근 사각형 경계면 교점 기반 법선 벡터
+        function updateTailRuntime(bubble, baseAngle, tipDx, tipDy, baseWidth) {
+            if (!bubble) return;
+            const pathFill = bubble.querySelector('.bubble-path-fill');
+            const pathStroke = bubble.querySelector('.bubble-path-stroke');
+            if (!pathFill || !pathStroke) return;
+
+            const bw = bubble.offsetWidth;
+            const bh = bubble.offsetHeight;
+            const cx = 500 + bw / 2;
+            const cy = 500 + bh / 2;
+            
+            const rad = (baseAngle || 45) * Math.PI / 180;
+            const dx = Math.cos(rad);
+            const dy = Math.sin(rad);
+            
+            const tx = cx + (tipDx || 30);
+            const ty = cy + (tipDy || 30);
+            
+            const halfW = bw / 2;
+            const halfH = bh / 2;
+
+            // [1] 말풍선 둥근 모서리(border-radius) 동적 파싱
+            const computedStyle = window.getComputedStyle(bubble);
+            const borderRadius = parseFloat(computedStyle.borderRadius) || 20;
+            const R = Math.min(borderRadius, halfW, halfH); // 버그 예방용 클램프
+
+            // 가상 직사각형 교점
+            const tv = halfW / Math.max(0.0001, Math.abs(dx));
+            const th = halfH / Math.max(0.0001, Math.abs(dy));
+            const tRect = Math.min(tv, th);
+            const rx = tRect * dx;
+            const ry = tRect * dy;
+
+            let bx_norm, by_norm;
+            const borderX = halfW - R;
+            const borderY = halfH - R;
+
+            // [2] 둥근 모서리 원호 방정식을 활용한 초정밀 접점 기하 연산
+            if (rx > borderX && ry < -borderY) {
+                // 우상 모서리 원호
+                const cxCorner = borderX;
+                const cyCorner = -borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx > borderX && ry > borderY) {
+                // 우하 모서리 원호
+                const cxCorner = borderX;
+                const cyCorner = borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx < -borderX && ry < -borderY) {
+                // 좌상 모서리 원호
+                const cxCorner = -borderX;
+                const cyCorner = -borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else if (rx < -borderX && ry > borderY) {
+                // 좌하 모서리 원호
+                const cxCorner = -borderX;
+                const cyCorner = borderY;
+                const b = dx * cxCorner + dy * cyCorner;
+                const c = cxCorner * cxCorner + cyCorner * cyCorner - R * R;
+                const tCorner = b + Math.sqrt(Math.max(0, b * b - c));
+                bx_norm = tCorner * dx;
+                by_norm = tCorner * dy;
+            } else {
+                // 가로/세로 평평한 경계면
+                bx_norm = rx;
+                by_norm = ry;
+            }
+
+            const finalWidth = (baseWidth !== undefined && baseWidth !== null) ? parseFloat(baseWidth) : 14; 
+            
+            // [4] 경계면 정합에 따른 base 오프셋 px, py 계산
+            let px, py;
+            if (tv < th) {
+                // 세로 경계선 교점 -> 세로 방향으로만 오프셋
+                px = 0;
+                py = Math.sign(dx || 1) * (finalWidth / 2);
+            } else if (th < tv) {
+                // 가로 경계선 교점 -> 가로 방향으로만 오프셋
+                px = -Math.sign(dy || 1) * (finalWidth / 2);
+                py = 0;
+            } else {
+                // 모서리 원호 교점 -> 법선 방향 오프셋
+                px = -dy * (finalWidth / 2);
+                py = dx * (finalWidth / 2);
+            }
+
+            let bx_stroke = cx + bx_norm;
+            let by_stroke = cy + by_norm;
+            const bx1_stroke = bx_stroke + px;
+            const by1_stroke = by_stroke + py;
+            const bx2_stroke = bx_stroke - px;
+            const by2_stroke = by_stroke - py;
+            const cpx_stroke = bx_stroke + (tx - bx_stroke) * 0.35;
+            const cpy_stroke = by_stroke + (ty - by_stroke) * 0.35;
+
+            // [3] 테두리용(Stroke) 패스: 0px 침투 (완벽히 모서리 경계에서 시작), fill: none
+            const d_stroke = `M ${bx1_stroke} ${by1_stroke} Q ${cpx_stroke} ${cpy_stroke} ${tx} ${ty} Q ${cpx_stroke} ${cpy_stroke} ${bx2_stroke} ${by2_stroke}`;
+            pathStroke.setAttribute('d', d_stroke);
+
+            // [3] 채우기용(Fill) 패스: Stroke와 100% 동일한 곡선을 사용하되, 안쪽으로 8px 확장 영역을 덧붙임
+            const bx1_in = bx1_stroke - dx * 8;
+            const by1_in = by1_stroke - dy * 8;
+            const bx2_in = bx2_stroke - dx * 8;
+            const by2_in = by2_stroke - dy * 8;
+            const d_fill = `M ${bx1_stroke} ${by1_stroke} Q ${cpx_stroke} ${cpy_stroke} ${tx} ${ty} Q ${cpx_stroke} ${cpy_stroke} ${bx2_stroke} ${by2_stroke} L ${bx2_in} ${by2_in} L ${bx1_in} ${by1_in} Z`;
+            pathFill.setAttribute('d', d_fill);
+
+            // [6] 말꼬리 가림막 레이어(.bubble-bg-cover) 실시간 배경색 싱크 보강
+            const bgCover = bubble.querySelector('.bubble-bg-cover');
+            if (bgCover) {
+                bgCover.style.backgroundColor = bubble.style.getPropertyValue('--bubble-color') || '#ffffff';
+            }
+        }
+
+        // [글로벌 BGM 런타임 최적화 동기화 제어 함수]
+        function syncGlobalBgmsRuntime(cutIndex) {
+            if (!isWebAudioInitialized) return;
+
+            // data.json 의 글로벌 bgms 설정을 파싱하여 로드
+            if (Object.keys(activeBgms).length === 0 && window.cutsData) {
+                // 최초 1회 activeBgms 맵 동적 초기화
+                const bgmDataList = window.cutsDataListBgms || []; 
+                // data.json 에 들어있는 bgms 배열을 직접 로드할 수 있도록 전역 대입
+            }
+
+            const bgmsArray = window.bgmsDataListGlobal || [];
+            
+            bgmsArray.forEach(b => {
+                const cardId = b.id;
+                const inRange = cutIndex >= b.startCut && cutIndex <= b.endCut;
+
+                if (!activeBgms[cardId]) {
+                    const audio = new Audio(normalizeMediaPath(b.audioUrl));
+                    audio.autoplay = false;
+                    audio.loop = true;
+                    audio.load();
+                    
+                    // 루프백 명시적 Fail-safe 복귀
+                    audio.addEventListener('ended', () => {
+                        if (audio.loop && activeBgms[cardId] && activeBgms[cardId].isPlaying) {
+                            audio.currentTime = activeBgms[cardId].startTime;
+                            audio.play().catch(e => console.log("Runtime Loop Error:", e));
+                        }
+                    });
+
+                    // viewer.js에 이식되어 있는 오디오 파이프에 노드 체인 연결
+                    if (window.audioPipeManager) {
+                        window.audioPipeManager.connectAudio(audio, 'bgm');
+                    }
+                    
+                    activeBgms[cardId] = {
+                        audio: audio,
+                        audioUrl: normalizeMediaPath(b.audioUrl),
+                        startCut: b.startCut,
+                        endCut: b.endCut,
+                        startTime: b.startTime,
+                        isPlaying: false
+                    };
+                }
+
+                const track = activeBgms[cardId];
+                if (inRange) {
+                    if (!track.isPlaying) {
+                        track.isPlaying = true;
+                        
+                        if (track.audio.fadeTimer) {
+                            clearInterval(track.audio.fadeTimer);
+                            track.audio.fadeTimer = null;
+                        }
+
+                        track.audio.currentTime = track.startTime;
+                        track.audio.volume = 0;
+                        
+                        track.audio.play().then(() => {
+                            fadeAudioRuntime(track.audio, 0, 0.25, 1000);
+                            
+                            // 배경음악과 화면 렌더링 동기화
+                            window.isFirstCutReady = true;
+                            if (typeof window.renderItemsFrame === 'function') {
+                                window.renderItemsFrame();
+                            }
+                        }).catch(e => {
+                            console.log("BGM 자동 재생 블로킹 우회대기:", e);
+                            track.isPlaying = false;
+                        });
+                    }
+                } else {
+                    if (track.isPlaying) {
+                        track.isPlaying = false;
+                        const audioToFade = track.audio;
+                        fadeAudioRuntime(audioToFade, audioToFade.volume, 0, 1000, () => {
+                            audioToFade.pause();
+                            audioToFade.currentTime = track.startTime;
+                        });
+                    }
+                }
+            });
+        }
+
+        // BGM 전용 페이드 아웃/인 런타임 함수
+        function fadeAudioRuntime(audio, startVol, endVol, durationMs, onComplete) {
+            if (audio.fadeTimer) {
+                clearInterval(audio.fadeTimer);
+                audio.fadeTimer = null;
+            }
+            
+            const steps = 20;
+            const interval = durationMs / steps;
+            const volStep = (endVol - startVol) / steps;
+            let currentStep = 0;
+            
+            audio.volume = startVol;
+            
+            audio.fadeTimer = setInterval(() => {
+                currentStep++;
+                let nextVol = startVol + volStep * currentStep;
+                if (nextVol < 0) nextVol = 0;
+                if (nextVol > 1) nextVol = 1;
+                audio.volume = nextVol;
+                
+                if (currentStep >= steps) {
+                    clearInterval(audio.fadeTimer);
+                    audio.fadeTimer = null;
+                    audio.volume = endVol;
+                    if (onComplete) onComplete();
+                }
+            }, interval);
+        }
+
+        // 글로벌 BGM 데이터는 DOMContentLoaded 시점에 data.json 으로부터 단일 스트림으로 완전 병합 바인딩 완료됨.
+
+        // ================= 스크롤 속도 계산, 가속 제어 및 양방향 진행 방향 감지 변수들 =================
+        var lastScrollTop = 0;
+        var lastScrollTime = performance.now();
+        var scrollEndTimeout = null;
+        var decelAnimId = null;
+
+        function decelerateMultiplier() {
+            if (window.isFastForwarding) return; 
+            if (window.speedMultiplier > 1.0) {
+                window.speedMultiplier -= 0.15; 
+                if (window.speedMultiplier < 1.0) window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                decelAnimId = requestAnimationFrame(decelerateMultiplier);
+            } else {
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+            }
+        }
+
+        function updateCutCounter() {
+            const counterSpan = document.getElementById('navCutCounter');
+            if (!counterSpan || !window.cutsData || window.cutsData.length === 0) return;
+            
+            const containerHeight = viewerScrollContainer.clientHeight || 740;
+            const scrollTop = viewerScrollContainer.scrollTop;
+            const currentCutIdx = Math.round(scrollTop / containerHeight);
+            
+            const totalActual = window.cutsData.length;
+            let displayIdx = currentCutIdx + 1;
+            if (displayIdx < 1) displayIdx = 1;
+            if (displayIdx > totalActual) displayIdx = totalActual;
+            
+            counterSpan.textContent = `${displayIdx} / ${totalActual}`;
+        }
+
+        // 뷰어 스크롤 감지 및 제어 연동
+        viewerScrollContainer.addEventListener('scroll', () => {
+            if (cutsData.length === 0) return;
+
+            if (window.isFastForwarding) {
+                lastScrollTop = viewerScrollContainer.scrollTop;
+                return;
+            }
+            
+            const now = performance.now();
+            const scrollTop = viewerScrollContainer.scrollTop;
+            const dt = now - lastScrollTime;
+            
+            if (dt > 10) {
+                const dy = Math.abs(scrollTop - lastScrollTop);
+                const scrollVelocity = dy / dt; // px/ms
+                
+                if (decelAnimId) {
+                    cancelAnimationFrame(decelAnimId);
+                    decelAnimId = null;
+                }
+                
+                window.speedMultiplier = 1.0 + Math.min(5.0, scrollVelocity * 2.5);
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                
+                lastScrollTime = now;
+            }
+
+            window.isScrollDirectionDown = scrollTop >= lastScrollTop;
+            lastScrollTop = scrollTop;
+
+            clearTimeout(scrollEndTimeout);
+            scrollEndTimeout = setTimeout(function checkScrollEnd() {
+                const scrollTop = viewerScrollContainer.scrollTop;
+                const containerHeight = viewerScrollContainer.clientHeight || 740;
+                
+                const targetCutIdx = Math.round(scrollTop / containerHeight);
+                const targetScrollTop = targetCutIdx * containerHeight;
+                
+                if (Math.abs(scrollTop - targetScrollTop) > 3) {
+                    scrollEndTimeout = setTimeout(checkScrollEnd, 50);
+                    return;
+                }
+                
+                if (!window.isSyncScrolling) {
+                    const activeCut = cutsData[targetCutIdx];
+                    if (activeCut) {
+                        const settledCutId = activeCut.id;
+                        
+                        if (settledCutId !== window.lastSettledCutId) {
+                            // [원자적 상태 리셋] 스레드 1프레임 렌더링에 의한 대사 번쩍임(Flash) 현상을 완전히 원천 봉쇄합니다.
+                            window.isTimeBasedAutoplay = true;
+                            window.accumulatedTime = 0.0;
+                            
+                            window.lastSettledCutId = settledCutId;
+                            window.currentCutId = settledCutId;
+                            
+                            if (typeof window.triggerAutoplayForCurrentCut === 'function') {
+                                window.triggerAutoplayForCurrentCut();
+                            }
+                        } else {
+                            if (!window.isTimeBasedAutoplay) {
+                                if (typeof window.restoreEditMode === 'function') {
+                                    window.restoreEditMode();
+                                }
+                            }
+                        }
+                    }
+                }
+            }, 150);
+
+            if (typeof window.handleScrollUpdate === 'function') {
+                window.handleScrollUpdate();
+            }
+            
+            updateCutCounter();
+        });
+
+        // 물리 인터랙션 발생 시 자동 재생 중지
+        function handleUserDirectInteraction() {
+            // 400ms 미세 관성 및 사용자 터치 해제 잔여 이벤트 락아웃 가드
+            if (performance.now() - (window.autoplayStartTime || 0) < 400) {
+                return;
+            }
+            if (window.isTimeBasedAutoplay && !window.isProgrammaticPlaying) {
+                if (typeof window.restoreEditMode === 'function') {
+                    window.restoreEditMode();
+                }
+                console.log("⏹ 수동 조작으로 연출이 중지되었습니다.");
+            }
+        }
+        
+        viewerScrollContainer.addEventListener('wheel', handleUserDirectInteraction, { passive: true });
+        viewerScrollContainer.addEventListener('touchstart', handleUserDirectInteraction, { passive: true });
+        viewerScrollContainer.addEventListener('mousedown', (e) => {
+            if (e.target === viewerScrollContainer) {
+                handleUserDirectInteraction();
+            }
+        });
+
+        // 모바일 바운스 스크롤 방어: viewerScrollContainer 내부 이외 영역의 터치 무브를 차단하여 화면 흔들림 방지
+        document.addEventListener('touchmove', function(e) {
+            if (!e.target.closest('#viewerScrollContainer')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // ================= 사용자 최초 인터랙션 및 오디오 컨텍스트 락킹 해제 =================
+        function startCinematicViewer() {
+            if (isWebAudioInitialized) return;
+            isWebAudioInitialized = true;
+            window.isAutoplayPending = false;
+
+            // User Gesture Unlock: 더미 무음 오디오를 터치 스택 내에서 재생 시도하여 모바일 오디오 락 해제
+            const dummyAudio = new Audio();
+            dummyAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==";
+            dummyAudio.play().then(() => {
+                dummyAudio.pause();
+            }).catch(e => console.log("Audio unlock dummy play bypass:", e));
+
+            // 1. Web Audio API 초기화 강제 트리거
+            if (window.audioPipeManager) {
+                window.audioPipeManager.init();
+                if (window.audioPipeManager.ctx && window.audioPipeManager.ctx.state === 'suspended') {
+                    window.audioPipeManager.ctx.resume().catch(() => {});
+                }
+            }
+
+            // 2. 인트로 오버레이 카드 미려하게 페이드아웃
+            introOverlay.style.opacity = '0';
+            setTimeout(() => {
+                introOverlay.style.display = 'none';
+            }, 600);
+
+            // 3. 첫번째 실제 컷(index 0) 오토플레이 즉시 트리거
+            if (cutsData.length > 0) {
+                const firstCut = cutsData[0];
+                window.currentCutId = firstCut.id;
+                window.lastSettledCutId = firstCut.id;
+                
+                // BGM 동기화 개시 (첫 번째 컷의 실제 index 번호로 BGM 동적 동기화)
+                syncGlobalBgmsRuntime(firstCut.index);
+                
+                // 1컷 자동 재생 기동
+                if (typeof window.triggerAutoplayForCurrentCut === 'function') {
+                    window.triggerAutoplayForCurrentCut();
+                }
+            }
+        }
+
+        // 인트로 오버레이 클릭 또는 감상 시작 버튼 터치 시 기동
+        introOverlay.addEventListener('click', startCinematicViewer);
+
+        // ================= [빨리감기] Double-click/tap and Hold 제스처 처리 =================
+        let lastMouseDownTime = 0;
+        let lastTouchStartTime = 0;
+
+        // 마우스 왼쪽 버튼 더블클릭 홀드 (웹/캔버스 환경)
+        viewerScrollContainer.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // 왼쪽 클릭만
+            const now = performance.now();
+            if (now - lastMouseDownTime < 300) {
+                window.isFastForwarding = true;
+                window.speedMultiplier = 4.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "⏩ 빨리 감기 진행 중 (4.0x)...";
+            }
+            lastMouseDownTime = now;
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            if (window.isFastForwarding) {
+                window.isFastForwarding = false;
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "스크롤 또는 Hold 시 빨리 감기";
+            }
+        });
+
+        // 스마트폰 터치 더블탭 홀드 (모바일/스마트폰 환경)
+        viewerScrollContainer.addEventListener('touchstart', (e) => {
+            const now = performance.now();
+            if (now - lastTouchStartTime < 300) {
+                window.isFastForwarding = true;
+                window.speedMultiplier = 4.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "⏩ 빨리 감기 진행 중 (4.0x)...";
+            }
+            lastTouchStartTime = now;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (window.isFastForwarding) {
+                window.isFastForwarding = false;
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "스크롤 또는 Hold 시 빨리 감기";
+            }
+        });
+
+        window.addEventListener('touchcancel', (e) => {
+            if (window.isFastForwarding) {
+                window.isFastForwarding = false;
+                window.speedMultiplier = 1.0;
+                if (typeof window.updatePlayingAudiosPlaybackRate === 'function') {
+                    window.updatePlayingAudiosPlaybackRate();
+                }
+                const floater = document.querySelector('.viewer-floater span');
+                if (floater) floater.textContent = "스크롤 또는 Hold 시 빨리 감기";
+            }
+        });
+
+        // 수동 스크롤 조작에 따른 글로벌 BGM 동적 동기화 브릿지 매핑
+        window.syncGlobalBgmsRuntime = syncGlobalBgmsRuntime;
+
+    </script>
+</body>
+</html>

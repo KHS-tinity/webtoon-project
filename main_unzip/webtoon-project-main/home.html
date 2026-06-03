@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>시네마틱 웹툰 사운드 극장 - Home</title>
+    <!-- Google Fonts & Pretendard CDN -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color-start: #090d16;
+            --bg-color-end: #020617;
+            --panel-bg: rgba(30, 41, 59, 0.45);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --accent-color: #6366f1;
+            --accent-hover: #818cf8;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-color-start), var(--bg-color-end));
+            color: var(--text-main);
+            margin: 0;
+            padding: 2.5rem 1.5rem;
+            min-height: 100vh;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            display: flex;
+            justify-content: center;
+        }
+
+        .home-container {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            gap: 3rem;
+            animation: pageFadeIn 0.5s ease-out;
+        }
+
+        @keyframes pageFadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 헤더 스타일 */
+        .home-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .home-logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #818cf8, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .home-logo span {
+            font-weight: 300;
+            color: var(--text-muted);
+        }
+
+        .btn-to-editor {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e2e8f0;
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-to-editor:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* 히어로 배너 */
+        .home-hero {
+            position: relative;
+            border-radius: 1.75rem;
+            height: 380px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5), 0 0 40px var(--primary-glow);
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .home-hero-bg {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-size: cover;
+            background-position: center 20%;
+            filter: brightness(0.55) saturate(1.1);
+            transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1;
+        }
+
+        .home-hero:hover .home-hero-bg {
+            transform: scale(1.03);
+        }
+
+        .home-hero-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to top, rgba(2, 6, 23, 0.96) 10%, rgba(2, 6, 23, 0.4) 60%, transparent 100%);
+            z-index: 2;
+        }
+
+        .home-hero-content {
+            position: relative;
+            z-index: 3;
+            padding: 3rem;
+            max-width: 650px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .hero-badge {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            padding: 0.25rem 0.6rem;
+            border-radius: 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            align-self: flex-start;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+        }
+
+        .hero-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.4rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.02em;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.6);
+        }
+
+        .hero-desc {
+            font-size: 0.95rem;
+            color: #cbd5e1;
+            margin: 0;
+            line-height: 1.6;
+            word-break: keep-all;
+        }
+
+        .hero-btn {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.8rem;
+            border-radius: 0.75rem;
+            font-weight: 800;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            align-self: flex-start;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .hero-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
+            filter: brightness(1.15);
+        }
+
+        /* 에피소드 영역 */
+        .home-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title span {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        .ep-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        /* 에피소드 카드 */
+        .ep-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 1.25rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .ep-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(99, 102, 241, 0.45);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.35), 0 0 15px rgba(99, 102, 241, 0.15);
+        }
+
+        .ep-card-thumb-wrapper {
+            position: relative;
+            width: 100%;
+            height: 170px;
+            overflow: hidden;
+        }
+
+        .ep-card-thumb {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+
+        .ep-card:hover .ep-card-thumb {
+            transform: scale(1.04);
+        }
+
+        /* 누락 썸네일 대체용 다크 그라데이션 플레이스홀더 */
+        .ep-card-placeholder {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #0f172a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            color: rgba(99, 102, 241, 0.35);
+            text-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+        }
+
+        .ep-card-chapter-tag {
+            position: absolute;
+            top: 0.75rem; left: 0.75rem;
+            background: var(--accent-color);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.35rem;
+            font-size: 0.68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .ep-card-body {
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            flex: 1;
+            justify-content: space-between;
+        }
+
+        .ep-card-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .ep-card-project-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .ep-card-chapter-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .ep-card-action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.75rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 0.75rem;
+        }
+
+        .ep-card-play-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .ep-card:hover .ep-card-play-label {
+            color: var(--accent-hover);
+        }
+
+        .ep-card-btn-play {
+            width: 28px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+            font-size: 0.72rem;
+            transition: all 0.2s;
+        }
+
+        .ep-card:hover .ep-card-btn-play {
+            background: var(--accent-color);
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="home-container">
+        <!-- 헤더 -->
+        <header class="home-header">
+            <div class="home-logo">🎬 CINEMATIC<span>THEATER</span></div>
+            <a href="index.html" class="btn-to-editor">🎨 디렉터 에디터</a>
+        </header>
+
+        <!-- CORS 경고 배너 -->
+        <div id="localCorsWarning" style="display: none; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 1rem; padding: 1.25rem; color: #cbd5e1; font-size: 0.88rem; line-height: 1.6; margin-top: -1rem; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.05);">
+            ℹ️ <strong>로컬 파일 직접 실행(CORS 제한) 구동 중:</strong><br>
+            브라우저 보안 정책으로 인해 <code>file:///</code> 경로에서는 로컬 JSON 파일을 읽을 수 없으므로, <strong>원격 깃허브 저장소의 JSON 데이터</strong>를 대신 실시간으로 연동하여 구동합니다.<br>
+            (※ 대사 및 사운드 등의 무거운 미디어 리소스는 사용자님의 PC 로컬 폴더(<code>자료/</code>)에서 즉시 불러오므로 원활하게 감상하셔도 됩니다.)<br>
+            만약 완전히 오프라인 상태이거나 로컬 디렉터리의 실시간 파일로 테스트하고 싶으시다면, 폴더 안의 <code>server.ps1</code> 서버를 기동하신 뒤 
+            <a href="http://localhost:8000/home.html" style="color: #818cf8; font-weight: 800; text-decoration: underline;">http://localhost:8000/home.html</a> 경로로 접속해 주시기 바랍니다.
+        </div>
+
+        <!-- 히어로 배너 -->
+        <section class="home-hero" id="heroBanner">
+            <div class="home-hero-bg" id="heroBg" style="background-image: url('자료/3.jpg');"></div>
+            <div class="home-hero-overlay"></div>
+            <div class="home-hero-content">
+                <span class="hero-badge">Featured Audio Webtoon</span>
+                <h2 class="hero-title" id="heroTitle">대항해시대 외전</h2>
+                <p class="hero-desc" id="heroDesc">입체 사운드와 역동적인 그래픽 연출로 구현된 제독들의 위대한 항해기. 이어폰을 착용하고 생생한 감상을 시작하세요.</p>
+                <button class="hero-btn" id="heroPlayBtn">▶ 1화 바로보기</button>
+            </div>
+        </section>
+
+        <!-- 에피소드 리스트 -->
+        <section class="home-section">
+            <h3 class="section-title"><span></span> 감상 가능한 에피소드</h3>
+            <div class="ep-grid" id="epGrid">
+                <!-- 동적 에피소드 렌더링 영역 -->
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // 기본 폴백 에피소드 리스트 (로컬 오프라인 등 대비 - 빈 목록으로 교체)
+        const fallbackEpisodes = [];
+        const fallbackThumb = '자료/1.jpg';
+
+        // 깃허브 도메인 및 리포지토리 동적 식별용 설정
+        const isGitHubPages = location.hostname.endsWith('github.io');
+        let githubUser = 'KHS-tinity';
+        let githubRepo = 'webtoon-project';
+
+        if (isGitHubPages) {
+            const parts = location.hostname.split('.');
+            githubUser = parts[0];
+            const pathParts = location.pathname.split('/');
+            if (pathParts.length > 1 && pathParts[1] !== "") {
+                githubRepo = pathParts[1];
+            }
+        }
+
+        // 깃허브 및 로컬 폴더에서 JSON 파일 동적 검색 함수 (3중 레이어 스캔)
+        async function scanEpisodeFiles() {
+            const filenamePattern = /^.+_\d+화\.json$/i;
+
+            // 1순위: 로컬 웹 서버 API 스캔 시도
+            try {
+                console.log("[Dynamic Scan] 1순위: 로컬 디렉터리 API 조회 중 (/api/episodes)");
+                const res = await fetch(`/api/episodes?t=${Date.now()}`);
+                if (res.ok) {
+                    const localFiles = await res.json();
+                    if (Array.isArray(localFiles) && localFiles.length > 0) {
+                        console.log("[Dynamic Scan] 로컬 API 스캔 성공:", localFiles);
+                        const filtered = localFiles
+                            .filter(name => filenamePattern.test(name))
+                            .map(name => ({ name: name, url: name }));
+                        return filtered;
+                    }
+                }
+            } catch (err) {
+                console.log("[Dynamic Scan] 로컬 API 사용 불가능 (정적 호스팅 또는 외부 환경):", err);
+            }
+
+            // 2순위: GitHub Contents API 스캔 시도 (모바일/깃허브 페이지 대응)
+            try {
+                const apiUrl = `https://api.github.com/repos/${githubUser}/${githubRepo}/contents/`;
+                console.log(`[Dynamic Scan] 2순위: GitHub REST API 조회 중: ${apiUrl}`);
+                
+                const res = await fetch(apiUrl);
+                if (res.ok) {
+                    const files = await res.json();
+                    if (Array.isArray(files)) {
+                        const scanned = files
+                            .filter(f => f.type === 'file' && filenamePattern.test(f.name))
+                            .map(f => ({ name: f.name, url: f.download_url }));
+
+                        if (scanned.length > 0) {
+                            console.log("[Dynamic Scan] GitHub API 스캔 성공:", scanned);
+                            return scanned;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("[Dynamic Scan] GitHub API 조회 실패:", err);
+            }
+
+            // 3순위: 최종 정적 폴백 레이어 사용 (빈 목록 반환)
+            console.log("[Dynamic Scan] 3순위: 최종 정적 폴백 목록 사용 (빈 목록 반환)");
+            return [];
+        }
+
+        async function loadEpisodes() {
+            const epGrid = document.getElementById('epGrid');
+            epGrid.innerHTML = '<div style="color: var(--text-muted); grid-column: 1/-1; padding: 3rem 0; text-align: center;">에피소드를 스캔 중입니다...</div>';
+            
+            const episodeFiles = await scanEpisodeFiles();
+            epGrid.innerHTML = '';
+            
+            let loadedEpisodes = [];
+
+            // 비동기로 병렬 처리하여 빠르게 JSON 파싱
+            const fetchPromises = episodeFiles.map(async (epFile) => {
+                const filename = epFile.name;
+                const fetchUrl = epFile.url;
+                
+                // 회차 추출 정규식: _([0-9]+)화
+                const match = filename.match(/_(\d+)화/);
+                const defaultChapter = match ? parseInt(match[1]) : (parseInt(filename) || 1);
+
+                try {
+                    const res = await fetch(`${fetchUrl}${fetchUrl.includes('?') ? '&' : '?'}t=${Date.now()}`);
+                    if (!res.ok) throw new Error(`${filename} fetch 실패`);
+                    const data = await res.json();
+                    
+                    return {
+                        filename: filename,
+                        fetchUrl: fetchUrl,
+                        projectTitle: data.projectTitle || '시네마틱 웹툰',
+                        thumbnail: data.thumbnail || '',
+                        chapter: data.chapter !== undefined ? data.chapter : defaultChapter,
+                        chapterTitle: data.chapterTitle || `${defaultChapter}화 - 타이틀 정보 없음`
+                    };
+                } catch (err) {
+                    console.warn(`[loadEpisodes] ${filename} 로딩 실패:`, err);
+                    return null;
+                }
+            });
+
+            const results = await Promise.allSettled(fetchPromises);
+            
+            results.forEach(res => {
+                if (res.status === 'fulfilled' && res.value !== null) {
+                    loadedEpisodes.push(res.value);
+                }
+            });
+
+            // 회차별(chapter) 정렬
+            loadedEpisodes.sort((a, b) => a.chapter - b.chapter);
+
+            // 히어로 배너 바인딩 동기화 (첫 번째 활성 회차 기준)
+            const heroPlayBtn = document.getElementById('heroPlayBtn');
+            if (loadedEpisodes.length > 0) {
+                const firstEp = loadedEpisodes[0];
+                document.getElementById('heroTitle').textContent = firstEp.projectTitle;
+                if (firstEp.thumbnail) {
+                    document.getElementById('heroBg').style.backgroundImage = `url('${firstEp.thumbnail}')`;
+                }
+                
+                heroPlayBtn.textContent = `▶ ${firstEp.chapterTitle} 바로보기`;
+                heroPlayBtn.style.display = 'flex';
+                
+                // 이벤트 복사 및 바인딩
+                const newHeroBtn = heroPlayBtn.cloneNode(true);
+                heroPlayBtn.parentNode.replaceChild(newHeroBtn, heroPlayBtn);
+                newHeroBtn.addEventListener('click', () => {
+                    playEpisode(firstEp.fetchUrl);
+                });
+            } else {
+                // 에피소드가 존재하지 않으면 바로보기 버튼을 숨깁니다.
+                if (heroPlayBtn) {
+                    heroPlayBtn.style.display = 'none';
+                }
+            }
+
+            // 화면에 렌더링
+            if (loadedEpisodes.length === 0) {
+                epGrid.innerHTML = '<div style="color: var(--text-muted); grid-column: 1/-1; padding: 3rem 0; text-align: center;">등록된 에피소드가 존재하지 않습니다.</div>';
+                return;
+            }
+
+            loadedEpisodes.forEach((ep, index) => {
+                const card = document.createElement('div');
+                card.className = 'ep-card';
+                
+                // 썸네일 존재 여부 분기 및 가드 렌더링
+                let thumbHtml = '';
+                if (ep.thumbnail) {
+                    thumbHtml = `<img class="ep-card-thumb" src="${ep.thumbnail}" alt="${ep.chapterTitle}" onerror="this.outerHTML='<div class=\\'ep-card-placeholder\\'>CINEMATIC</div>';">`;
+                } else {
+                    thumbHtml = `<div class="ep-card-placeholder">CINEMATIC</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="ep-card-thumb-wrapper">
+                        ${thumbHtml}
+                        <span class="ep-card-chapter-tag">EP. ${ep.chapter}</span>
+                    </div>
+                    <div class="ep-card-body">
+                        <div class="ep-card-meta">
+                            <span class="ep-card-project-title">${ep.projectTitle}</span>
+                            <h4 class="ep-card-chapter-title">${ep.chapterTitle}</h4>
+                        </div>
+                        <div class="ep-card-action-bar">
+                            <span class="ep-card-play-label">감상하기</span>
+                            <div class="ep-card-btn-play">▶</div>
+                        </div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    playEpisode(ep.fetchUrl);
+                });
+
+                epGrid.appendChild(card);
+            });
+
+        }
+
+        function playEpisode(fileUrl) {
+            // 보안 차단 프록시 우회용 진입 세션키 임시 저장
+            sessionStorage.setItem('allowViewerEntry', 'true');
+            window.location.href = `viewer.html?file=${encodeURIComponent(fileUrl)}`;
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.location.protocol === 'file:') {
+                const warningBanner = document.getElementById('localCorsWarning');
+                if (warningBanner) {
+                    warningBanner.style.display = 'block';
+                }
+            }
+            loadEpisodes();
+        });
+    </script>
+</body>
+</html>

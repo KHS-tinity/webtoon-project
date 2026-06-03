@@ -143,54 +143,6 @@
             box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
             transition: transform 0.5s ease;
         }
-
-        /* 롱테이크 컷 전용 스타일 */
-        .is-preview-long-take { position: relative !important; height: auto !important; max-height: none !important; }
-        .is-preview-long-take img { height: auto !important; max-height: none !important; display: block; width: 100%; }
-        .is-preview-long-take img.cut-layer { position: absolute; }
-        .is-preview-long-take img.cut-layer:first-of-type { position: relative !important; }
-
-        /* 퀵 스크롤바 디자인 및 위치 보정 */
-        .mobile-frame-wrapper {
-            position: relative;
-            display: inline-block;
-        }
-        .quick-scroll-track {
-            position: absolute;
-            right: -22px;
-            top: 35px;
-            bottom: 35px;
-            width: 8px;
-            background: rgba(0, 0, 0, 0.15);
-            border-radius: 4px;
-            z-index: 1000;
-            touch-action: none;
-            user-select: none;
-            transition: width 0.2s ease, right 0.2s ease;
-        }
-        .quick-scroll-track:hover {
-            width: 12px;
-            right: -24px;
-        }
-        .quick-scroll-handle {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.75);
-            border: 1px solid rgba(0, 0, 0, 0.6);
-            box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
-            border-radius: 4px;
-            cursor: pointer;
-            box-sizing: border-box;
-            transition: background 0.2s ease;
-        }
-        .quick-scroll-handle.dragging,
-        .quick-scroll-handle:hover,
-        .quick-scroll-track:hover .quick-scroll-handle {
-            background: rgba(255, 255, 255, 0.95);
-        }
         
         .cut-bg-image, .cut-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -259,10 +211,6 @@
             transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
             color: var(--text-color);
             background-color: transparent;
-            pointer-events: auto;
-        }
-        .speech-bubble.animate, .speech-bubble:not(.show) {
-            pointer-events: none !important;
         }
         .bubble-text-layer { position: relative; z-index: 10; pointer-events: none; white-space: pre-wrap; word-break: break-all; }
         .bubble-shadow-layer {
@@ -555,16 +503,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- [컷 이미지 작업 규격 가이드] 안내 박스 -->
-                    <div style="background: #f9f9f9; padding: 12px; border-radius: 6px; font-size: 13px; border: 1px solid #e5e7eb; color: #4b5563; line-height: 1.6; margin-top: 0.5rem;">
-                        <div style="font-weight: 700; margin-bottom: 6px; color: #1f2937;">[컷 이미지 작업 규격 가이드]</div>
-                        <ul style="margin: 0; padding-left: 15px; list-style-type: disc;">
-                            <li style="margin-bottom: 4px;">가로 표준: 1080px (세로 길이 자유)</li>
-                            <li style="margin-bottom: 4px;">최대 가로 폭: 1920px 이하 필수 (초과 시 업로드 차단)</li>
-                            <li>디자인 팁: 모바일 고해상도 출력을 위해 실제 보이는 크기보다 3배 크게(1080px) 작업하는 것을 권장합니다.</li>
-                        </ul>
-                    </div>
                 </div>
 
                 <div class="section-title">
@@ -596,16 +534,10 @@
 
         <div class="preview-wrapper">
             <div class="preview-title">Scene Canvas</div>
-            <div class="mobile-frame-wrapper">
-                <div class="mobile-frame" id="mobileFrame">
-                    <!-- 신규 스냅 스크롤 컨테이너 -->
-                    <div class="viewer-scroll-container" id="viewerScrollContainer">
-                        <!-- 동적 생성: .viewer-cut-item -->
-                    </div>
-                </div>
-                <!-- 롱테이크 전용 퀵 드래그 스크롤바 (뷰어 프레임 외부에 배치) -->
-                <div class="quick-scrollbar quick-scroll-track" id="quickScrollTrack" style="display: none;">
-                    <div class="quick-scroll-handle" id="quickScrollHandle"></div>
+            <div class="mobile-frame" id="mobileFrame">
+                <!-- 신규 스냅 스크롤 컨테이너 -->
+                <div class="viewer-scroll-container" id="viewerScrollContainer">
+                    <!-- 동적 생성: .viewer-cut-item -->
                 </div>
             </div>
             </div> <!-- editorMainPanel -->
@@ -674,34 +606,16 @@
             metaThumbnailUpload.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    const tempUrl = URL.createObjectURL(file);
-                    const img = new Image();
-                    img.onload = function() {
-                        // 이중 검증 로직 (img.naturalWidth 및 img.width 동시 검증)
-                        if (img.naturalWidth > 1920 || img.width > 1920) {
-                            alert('경고: 가로 길이는 최대 1920px을 초과할 수 없습니다.');
-                            metaThumbnailUpload.value = ''; // 업로드 즉시 중단(cancel)
-                            URL.revokeObjectURL(tempUrl);
-                            return;
-                        }
-                        
-                        metaThumbnailName.textContent = file.name;
-                        const reader = new FileReader();
-                        reader.onload = function(evt) {
-                            metaThumbnailPreview.src = evt.target.result;
-                            metaThumbnailPreviewContainer.style.display = "flex";
-                            window.loadedThumbnailUrl = ""; // 새 파일 로드했으므로 loadedUrl 제거
-                            checkInterlockStages();
-                            URL.revokeObjectURL(tempUrl);
-                        };
-                        reader.readAsDataURL(file);
+                    metaThumbnailName.textContent = file.name;
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        metaThumbnailPreview.src = evt.target.result;
+                        metaThumbnailPreviewContainer.style.display = "flex";
+                        window.loadedThumbnailUrl = ""; // 새 파일 로드했으므로 loadedUrl 제거
+                        checkInterlockStages();
                     };
-                    img.onerror = function() {
-                        alert('이미지를 로드하는 중 오류가 발생했습니다.');
-                        metaThumbnailUpload.value = '';
-                        URL.revokeObjectURL(tempUrl);
-                    };
-                    img.src = tempUrl;
+                    reader.readAsDataURL(file);
                 } else {
                     metaThumbnailName.textContent = "선택안됨";
                     metaThumbnailPreviewContainer.style.display = "none";
@@ -757,7 +671,6 @@
         var lastSettledCutId = window.lastSettledCutId = window.lastSettledCutId || null;     // 신규: 스크롤 정지 시 중복 재생 방지 상태 캐시
         var lastFrameTime = window.lastFrameTime = window.lastFrameTime || 0;           // 신규: 시간 기반 프레임 연출 갱신용 타임스탬프
         var isProgrammaticPlaying = window.isProgrammaticPlaying = window.isProgrammaticPlaying || false; // 신규: 재생(Play) 버튼을 통한 programmatic 재생 중 플래그
-        var isLongTakeScrolling = window.isLongTakeScrolling = window.isLongTakeScrolling || false; // 신규: 롱테이크 스크롤 전용 상태 플래그
 
         // [성능 개선 2 - 데이터 동기화 헬퍼 함수]
         function updateCutItemData(cutId, itemId, updatedProperties) {
@@ -784,9 +697,6 @@
             // 기존에 생성되어 있던 레이어 엘리먼트들 일괄 소멸
             cutItem.querySelectorAll('.cut-layer, .cut-bg-image').forEach(el => el.remove());
 
-            // 롱테이크 클래스 초기화
-            cutItem.classList.remove('is-preview-long-take');
-
             function buildLayer(layerIndex, layerObj) {
                 if (!layerObj || !layerObj.url) return null;
 
@@ -803,16 +713,8 @@
                     el.setAttribute('muted', '');
                     el.setAttribute('playsinline', '');
                 } else {
-                    el = document.createElement('img');
-                    el.onload = function() {
-                        const containerHeight = (window.viewerScrollContainer && window.viewerScrollContainer.clientHeight) || window.innerHeight;
-                        // 이미지의 실제 높이가 미리보기 컨테이너 높이의 1.1배 이상인지 검증
-                        if (el.naturalHeight >= containerHeight * 1.1) {
-                            cutItem.classList.add('is-preview-long-take');
-                        }
-                        updateScrollSnapState(); // 렌더링 시점에 즉시 감지하여 스냅 상태 갱신
-                    };
-                    el.src = layerObj.url;
+                    el = document.createElement('div');
+                    el.style.backgroundImage = `url(${layerObj.url})`;
                 }
 
                 el.className = 'cut-layer';
@@ -852,7 +754,6 @@
                 cutItem.style.backgroundImage = 'none';
                 cutItem.style.backgroundColor = '#111827';
             }
-            updateScrollSnapState(); // 레이어가 삭제되거나 구조가 바뀔 때 스냅 상태 갱신
         }
 
         function createCut() {
@@ -898,7 +799,6 @@
                 viewerScrollContainer.appendChild(cutItem);
 
                 selectCut(cutId, true);
-                updateScrollSnapState(); // 신규 컷 생성 시 즉시 스냅 상태 동기화
                 return cutId;
             } catch (err) {
                 console.error("[createCut Error]", err);
@@ -913,13 +813,9 @@
                 if (cutItem) {
                     const layers = cutItem.querySelectorAll('.cut-layer, .cut-bg-image');
                     const isActive = c.id === cutId;
-
-                    // is-preview-long-take 클래스는 img.onload 시 동적 부여된 것이므로
-                    // className 초기화 전에 반드시 보존한 뒤 재부착한다
-                    const wasLongTake = cutItem.classList.contains('is-preview-long-take');
+                    
                     cutItem.className = 'viewer-cut-item';
-                    if (wasLongTake) cutItem.classList.add('is-preview-long-take');
-
+                    
                     layers.forEach(layer => {
                         layer.className = layer.classList.contains('cut-layer') ? 'cut-layer' : 'cut-bg-image';
                         if (c.effectType && c.effectType !== 'none') {
@@ -1279,71 +1175,11 @@
             });
         }
 
-        // 현재 스크롤 위치 기준 활성화된 컷의 정보와 요소를 실시간으로 조회하는 헬퍼 함수
-        function getActiveCut() {
-            if (cuts.length === 0) return null;
-            if (!viewerScrollContainer) {
-                viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
-            }
-            if (!viewerScrollContainer) return null;
-            
-            const containerRect = viewerScrollContainer.getBoundingClientRect();
-            const centerY = containerRect.top + containerRect.height / 2; // 화면 정중앙 절대 Y 좌표
-            
-            let activeCut = null;
-            let cutItem = null;
-            let index = -1;
-            
-            for (let i = 0; i < cuts.length; i++) {
-                const item = document.getElementById(`viewerCut_${cuts[i].id}`);
-                if (item) {
-                    const rect = item.getBoundingClientRect();
-                    // 화면 정중앙 Y 좌표가 해당 컷 영역 내에 위치하는지 판정
-                    if (centerY >= rect.top && centerY < rect.bottom) {
-                        activeCut = cuts[i];
-                        cutItem = item;
-                        index = i;
-                        break;
-                    }
-                }
-            }
-            if (!activeCut) {
-                activeCut = cuts[0];
-                cutItem = document.getElementById(`viewerCut_${activeCut.id}`);
-                index = 0;
-            }
-            return { cut: activeCut, element: cutItem, index: index };
-        }
 
-        // 프로젝트 내 롱테이크 존재 여부에 따라 컨테이너의 스냅 속성을 상시 제어하는 헬퍼 함수
-        function updateScrollSnapState() {
-            if (!viewerScrollContainer) {
-                viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
-            }
-            if (!viewerScrollContainer) return;
-            const hasLongTake = viewerScrollContainer.querySelector('.is-preview-long-take') !== null;
-            if (hasLongTake) {
-                if (viewerScrollContainer.style.getPropertyValue('scroll-snap-type') !== 'none') {
-                    viewerScrollContainer.style.setProperty('scroll-snap-type', 'none', 'important');
-                }
-            } else {
-                if (viewerScrollContainer.style.getPropertyValue('scroll-snap-type') !== 'y mandatory') {
-                    viewerScrollContainer.style.setProperty('scroll-snap-type', 'y mandatory', 'important');
-                }
-            }
-        }
 
-        // 우측 뷰어 스크롤 감지 및 제어 연동 (명명된 함수 handleScroll로 분리)
-        function handleScroll(e) {
-            if (isLongTakeScrolling) {
-                // 롱테이크 내부 스크롤 중에도 퀵 스크롤바 핸들 위치는 실시간 갱신
-                if (typeof updateQuickScrollbarHandle === 'function') updateQuickScrollbarHandle();
-                return;
-            }
+        // 우측 뷰어 스크롤 감지 및 제어 연동
+        viewerScrollContainer.addEventListener('scroll', () => {
             if (cuts.length === 0) return;
-
-            // 프로젝트 내에 롱테이크 존재 여부에 따라 CSS Scroll-Snap 상시 설정 제어
-            updateScrollSnapState();
 
             if (isFastForwarding) {
                 lastScrollTop = viewerScrollContainer.scrollTop;
@@ -1382,48 +1218,12 @@
 
             clearTimeout(scrollEndTimeout);
             scrollEndTimeout = setTimeout(function checkScrollEnd() {
-                if (isLongTakeScrolling || window.isDraggingQuickScroll) {
-                    return; // 롱테이크 스크롤 중이거나 퀵 드래그 중에는 정렬 판정을 완전히 보류
-                }
                 const scrollTop = viewerScrollContainer.scrollTop;
                 const containerHeight = viewerScrollContainer.clientHeight || 640;
                 
-                let activeCut = null;
-                let targetScrollTop = 0;
-                
-                for (let i = 0; i < cuts.length; i++) {
-                    const cutItem = document.getElementById(`viewerCut_${cuts[i].id}`);
-                    if (cutItem) {
-                        const top = cutItem.offsetTop;
-                        const height = cutItem.clientHeight;
-                        
-                        // 현재 스크롤 위치가 이 컷의 세로 영역에 속하는지 체크
-                        if (scrollTop >= top - 10 && scrollTop < top + height - 10) {
-                            activeCut = cuts[i];
-                            const isLongTake = cutItem.classList.contains('is-preview-long-take');
-                            if (isLongTake) {
-                                const maxScroll = top + height - containerHeight;
-                                // 롱테이크 내부 스크롤 시에는 경계선(5px 이내)에 있는 경우만 경계선으로 스냅하고,
-                                // 그 외(중간 영역)에는 현재 위치에 그대로 안착하여 튕김 현상 방지
-                                if (scrollTop <= top + 5) {
-                                    targetScrollTop = top;
-                                } else if (scrollTop >= maxScroll - 5) {
-                                    targetScrollTop = maxScroll;
-                                } else {
-                                    targetScrollTop = scrollTop;
-                                }
-                            } else {
-                                targetScrollTop = top;
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                if (!activeCut && cuts.length > 0) {
-                    activeCut = cuts[0];
-                    targetScrollTop = 0;
-                }
+                // 현재 스크롤 위치와 가장 가까운 스냅 목표 오프셋 계산
+                const targetCutIdx = Math.round(scrollTop / containerHeight);
+                const targetScrollTop = targetCutIdx * containerHeight;
                 
                 // [스마트 안착 대기] 네이티브 CSS 스냅 스크롤이 안착점에 도달할 때까지 50ms 재귀 폴링
                 if (Math.abs(scrollTop - targetScrollTop) > 3) {
@@ -1432,21 +1232,24 @@
                 }
                 
                 // 이제 진짜 스냅 정지 지점에 정밀 안착함!
-                if (!isSyncScrolling && activeCut) {
-                    const settledCutId = activeCut.id;
-                    
-                    // 활성 컷이 실제로 변경된 경우에만 0.0초 시점부터 시네마틱 자동 재생
-                    if (settledCutId !== lastSettledCutId) {
-                        isTimeBasedAutoplay = true;
-                        accumulatedTime = 0.0;
-                        lastSettledCutId = settledCutId;
-                        currentCutId = settledCutId; // 명시적 싱크
-                        triggerAutoplayForCurrentCut();
-                    } else {
-                        // [개선] 자동 재생 연출(isTimeBasedAutoplay)이 이미 성공적으로 시작되어 돌고 있는 동안에는,
-                        // 미세 잔여 스냅 안착 판정에 의해 restoreEditMode()가 조기에 강제 소환되는 것을 철저히 격리합니다!
-                        if (!isTimeBasedAutoplay) {
-                            restoreEditMode();
+                if (!isSyncScrolling) {
+                    const activeCut = cuts[targetCutIdx];
+                    if (activeCut) {
+                        const settledCutId = activeCut.id;
+                        
+                        // 활성 컷이 실제로 변경된 경우에만 0.0초 시점부터 시네마틱 자동 재생
+                        if (settledCutId !== lastSettledCutId) {
+                            isTimeBasedAutoplay = true;
+                            accumulatedTime = 0.0;
+                            lastSettledCutId = settledCutId;
+                            currentCutId = settledCutId; // 명시적 싱크
+                            triggerAutoplayForCurrentCut();
+                        } else {
+                            // [개선] 자동 재생 연출(isTimeBasedAutoplay)이 이미 성공적으로 시작되어 돌고 있는 동안에는,
+                            // 미세 잔여 스냅 안착 판정에 의해 restoreEditMode()가 조기에 강제 소환되는 것을 철저히 격리합니다!
+                            if (!isTimeBasedAutoplay) {
+                                restoreEditMode();
+                            }
                         }
                     }
                 }
@@ -1458,9 +1261,7 @@
 
             // 2. 스크롤 진행 상황 처리
             handleScrollUpdate();
-        }
-        
-        viewerScrollContainer.addEventListener('scroll', handleScroll);
+        });
 
         // [신규] 사용자의 진짜 물리적인 수동 인터랙션(휠 굴리기, 터치 시작 등) 발생 시에만
         // 안전하게 자동 재생 연출을 정지시키고 편집/수동 스크러빙 모드로 회귀시킵니다.
@@ -1475,146 +1276,8 @@
             }
         }
         
-        // 휠 스크롤 인터랙션 제어 (롱테이크 스냅 오동작 방지 및 관성 해제 대응)
-        viewerScrollContainer.addEventListener('wheel', (e) => {
-            handleUserDirectInteraction();
-
-            if (cuts.length === 0) return;
-
-            // 이미 화면이 전환(스크롤 애니메이션)되고 있는 중이라면 추가 휠 이벤트를 모두 차단
-            if (window.programmaticScrollAnimId) {
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-            }
-
-            // ─── 휠 delta 정규화 (deltaMode 에 따라 단위가 다름) ───
-            // deltaMode 0 = pixel(px), 1 = line(≈40px), 2 = page(≈600px)
-            let delta = e.deltaY;
-            if (e.deltaMode === 1) delta *= 40;   // line → px
-            if (e.deltaMode === 2) delta *= 600;  // page → px
-
-            if (Math.abs(delta) < 2) return; // 미세 휠 잡음 방지
-
-            // ─── 네이버 웹툰 체감 속도 배율 (롱테이크 전용) ───
-            // 기본 delta는 마우스 한 노치 ≈ 100px → 배율 2.5 적용 시 ≈ 250px/노치
-            // 2,000px 짜리 긴 이미지를 6~8 노치에 통독 가능한 웹툰 최적 속도
-            const LONGTAKE_SCROLL_SPEED = 2.5;
-
-
-            const scrollTop = viewerScrollContainer.scrollTop;
-            const containerHeight = viewerScrollContainer.clientHeight || 640;
-
-            // ─── scrollTop 기반으로 현재 위치한 컷을 정밀하게 결정 ───
-            // getBoundingClientRect 의 실시간 좌표 변동에 의존하지 않고
-            // offsetTop 기준으로 각 컷의 [상단~하단] 범위를 직접 비교한다.
-            let activeCutIdx = -1;
-            let activeCutEl = null;
-
-            for (let i = 0; i < cuts.length; i++) {
-                const el = document.getElementById(`viewerCut_${cuts[i].id}`);
-                if (!el) continue;
-                const top = el.offsetTop;
-                const bottom = top + el.clientHeight;
-                // scrollTop 이 이 컷의 [top, bottom) 범위 안에 있으면 현재 컷
-                if (scrollTop >= top - 1 && scrollTop < bottom - 1) {
-                    activeCutIdx = i;
-                    activeCutEl = el;
-                    break;
-                }
-            }
-
-            // 범위에서 못 찾은 경우(경계 근처) → 가장 가까운 컷으로 폴백
-            if (activeCutIdx === -1) {
-                let minDist = Infinity;
-                for (let i = 0; i < cuts.length; i++) {
-                    const el = document.getElementById(`viewerCut_${cuts[i].id}`);
-                    if (!el) continue;
-                    const d = Math.abs(el.offsetTop - scrollTop);
-                    if (d < minDist) { minDist = d; activeCutIdx = i; activeCutEl = el; }
-                }
-            }
-
-            if (activeCutIdx === -1 || !activeCutEl) return;
-
-            const isLongTake = activeCutEl.classList.contains('is-preview-long-take');
-
-            // ─── 롱테이크 가드 ───
-            if (isLongTake) {
-                const cutTop    = activeCutEl.offsetTop;
-                const cutBottom = cutTop + activeCutEl.clientHeight; // 롱테이크 컷의 실제 절대 하단
-                const viewBottom = scrollTop + containerHeight;       // 현재 뷰포트 하단
-
-                if (delta > 0) {
-                    // ▼ 아래 스크롤: 롱테이크 이미지 하단이 뷰포트 하단보다 아래에 있으면 내부 스크롤
-                    if (cutBottom > viewBottom + 1) {
-                        isLongTakeScrolling = true;
-                        const maxScrollTop = cutBottom - containerHeight;
-                        viewerScrollContainer.scrollTop = Math.min(maxScrollTop, scrollTop + delta * LONGTAKE_SCROLL_SPEED);
-                        if (typeof updateQuickScrollbarHandle === 'function') updateQuickScrollbarHandle();
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                    }
-                    // 롱테이크 하단 완전 도달 → 다음 컷으로 전환
-                    isLongTakeScrolling = false;
-                    if (activeCutIdx < cuts.length - 1) {
-                        selectCut(cuts[activeCutIdx + 1].id, true);
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                    return;
-                } else {
-                    // ▲ 위 스크롤: 롱테이크 이미지 상단이 뷰포트 상단보다 위에 있으면 내부 스크롤
-                    if (cutTop < scrollTop - 1) {
-                        isLongTakeScrolling = true;
-                        viewerScrollContainer.scrollTop = Math.max(cutTop, scrollTop + delta * LONGTAKE_SCROLL_SPEED);
-                        if (typeof updateQuickScrollbarHandle === 'function') updateQuickScrollbarHandle();
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                    }
-                    // 롱테이크 상단 완전 도달 → 이전 컷으로 전환
-                    isLongTakeScrolling = false;
-                    if (activeCutIdx > 0) {
-                        selectCut(cuts[activeCutIdx - 1].id, true);
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                    return;
-                }
-            }
-
-            // ─── 일반 컷: 다음/이전 컷 전환 ───
-            isLongTakeScrolling = false;
-            const hasLongTake = viewerScrollContainer.querySelector('.is-preview-long-take') !== null;
-            if (hasLongTake) {
-                if (delta < 0 && activeCutIdx > 0) {
-                    selectCut(cuts[activeCutIdx - 1].id, true);
-                    e.preventDefault();
-                    e.stopPropagation();
-                } else if (delta > 0 && activeCutIdx < cuts.length - 1) {
-                    selectCut(cuts[activeCutIdx + 1].id, true);
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            }
-        }, { passive: false });
-
-        let touchStartY = 0;
-        
-        viewerScrollContainer.addEventListener('touchstart', (e) => {
-            handleUserDirectInteraction();
-            
-            if (cuts.length === 0) return;
-            const activeInfo = getActiveCut();
-            if (!activeInfo || !activeInfo.element) return;
-            
-            const isLongTake = activeInfo.element.classList.contains('is-preview-long-take');
-            if (isLongTake) {
-                touchStartY = e.touches[0].clientY;
-            }
-        }, { passive: true });
+        viewerScrollContainer.addEventListener('wheel', handleUserDirectInteraction, { passive: true });
+        viewerScrollContainer.addEventListener('touchstart', handleUserDirectInteraction, { passive: true });
         viewerScrollContainer.addEventListener('mousedown', (e) => {
             // 스크롤바 드래그나 스크롤 영역 클릭으로 수동 인터랙션 개시 시
             if (e.target === viewerScrollContainer) {
@@ -1629,70 +1292,28 @@
                 if (file && currentCutId) {
                     const cut = cuts.find(c => c.id === currentCutId);
                     const layerPropName = `layer${layerIndex}`;
-                    const type = file.type.startsWith('video/') ? 'video' : 'image';
-
-                    if (type === 'image') {
-                        const tempUrl = URL.createObjectURL(file);
-                        const img = new Image();
-                        img.onload = function() {
-                            // 이중 검증 로직 (img.naturalWidth 및 img.width 동시 검증)
-                            if (img.naturalWidth > 1920 || img.width > 1920) {
-                                alert('경고: 가로 길이는 최대 1920px을 초과할 수 없습니다.');
-                                uploadInput.value = ''; // 업로드 즉시 중단(cancel)
-                                URL.revokeObjectURL(tempUrl);
-                                return;
-                            }
-
-                            // 기존 리소스 해제
-                            if (cut[layerPropName] && cut[layerPropName].url) {
-                                URL.revokeObjectURL(cut[layerPropName].url);
-                            }
-
-                            cut[layerPropName] = {
-                                url: tempUrl,
-                                name: file.name,
-                                type: type
-                            };
-                            
-                            nameSpan.textContent = file.name;
-                            nameSpan.style.color = '#1f2937';
-                            clearBtn.style.display = 'inline-block';
-
-                            const cutItem = document.getElementById(`viewerCut_${currentCutId}`);
-                            if (cutItem) {
-                                renderCutLayers(cutItem, cut);
-                            }
-                            showStatus(`컷 ${cut.index} 레이어 ${layerIndex} 로드 완료!`);
-                        };
-                        img.onerror = function() {
-                            alert('이미지를 로드하는 중 오류가 발생했습니다.');
-                            uploadInput.value = '';
-                            URL.revokeObjectURL(tempUrl);
-                        };
-                        img.src = tempUrl;
-                    } else {
-                        // 비디오인 경우 이미지 검증 제외하고 즉시 반영
-                        // 기존 리소스 해제
-                        if (cut[layerPropName] && cut[layerPropName].url) {
-                            URL.revokeObjectURL(cut[layerPropName].url);
-                        }
-
-                        cut[layerPropName] = {
-                            url: URL.createObjectURL(file),
-                            name: file.name,
-                            type: type
-                        };
-                        
-                        nameSpan.textContent = file.name;
-                        nameSpan.style.color = '#1f2937';
-                        clearBtn.style.display = 'inline-block';
-
-                        const cutItem = document.getElementById(`viewerCut_${currentCutId}`);
-                        if (cutItem) {
-                            renderCutLayers(cutItem, cut);
-                        }
-                        showStatus(`컷 ${cut.index} 레이어 ${layerIndex} 로드 완료!`);
+                    
+                    // 기존 리소스 해제
+                    if (cut[layerPropName] && cut[layerPropName].url) {
+                        URL.revokeObjectURL(cut[layerPropName].url);
                     }
+
+                    const type = file.type.startsWith('video/') ? 'video' : 'image';
+                    cut[layerPropName] = {
+                        url: URL.createObjectURL(file),
+                        name: file.name,
+                        type: type
+                    };
+                    
+                    nameSpan.textContent = file.name;
+                    nameSpan.style.color = '#1f2937';
+                    clearBtn.style.display = 'inline-block';
+
+                    const cutItem = document.getElementById(`viewerCut_${currentCutId}`);
+                    if (cutItem) {
+                        renderCutLayers(cutItem, cut);
+                    }
+                    showStatus(`컷 ${cut.index} 레이어 ${layerIndex} 로드 완료!`);
                 }
             });
 
@@ -2667,12 +2288,7 @@
         }
         
         document.addEventListener('mousedown', (e) => {
-            if (isProgrammaticPlaying) return; // 자동 재생 연출 중에만 드래그 차단
-            
-            // 수동 스크롤이나 대사 수정을 즉시 허용하기 위해, 플레이 모드라면 복구 처리
-            if (isPlayMode) {
-                restoreEditMode();
-            }
+            if (isPlayMode) return; // 재생 중에는 드래그 차단
             
             const handle = e.target;
             if (handle.classList.contains('base-handle')) {
@@ -2729,12 +2345,6 @@
                 dragStartY = e.clientY;
                 dragStartBubbleLeft = parseFloat(bubble.style.left) || 0;
                 dragStartBubbleTop = parseFloat(bubble.style.top) || 0;
-
-                // 마우스 클릭 시 말풍선 내부에서의 상대적 오프셋 저장 (스크롤 및 레이아웃 드래그 오차 방지)
-                const bubbleRect = bubble.getBoundingClientRect();
-                window.dragStartOffsetX = e.clientX - bubbleRect.left;
-                window.dragStartOffsetY = e.clientY - bubbleRect.top;
-
                 e.preventDefault();
             }
         });
@@ -2751,12 +2361,10 @@
             const rect = sceneCanvas.getBoundingClientRect();
             
             if (isDraggingBubble) {
-                // 부모 캔버스(sceneCanvas) 대비 마우스의 현재 상대 좌표 계산 (스크롤 오프셋 자동 반영)
-                const mouseXInCanvas = e.clientX - rect.left - (window.dragStartOffsetX || 0);
-                const mouseYInCanvas = e.clientY - rect.top - (window.dragStartOffsetY || 0);
-                
-                let newX = (mouseXInCanvas / rect.width) * 100;
-                let newY = (mouseYInCanvas / rect.height) * 100;
+                const dx = ((e.clientX - dragStartX) / rect.width) * 100;
+                const dy = ((e.clientY - dragStartY) / rect.height) * 100;
+                let newX = dragStartBubbleLeft + dx;
+                let newY = dragStartBubbleTop + dy;
                 
                 newX = Math.max(0, Math.min(100, newX));
                 newY = Math.max(0, Math.min(100, newY));
@@ -3209,7 +2817,6 @@
             if (cuts.length > 0) {
                 lastSettledCutId = cuts[0].id;
             }
-            updateScrollSnapState();
         });
 
         // ================= [빨리감기] Double-click/tap and Hold 제스처 처리 =================
@@ -3270,346 +2877,6 @@
                 showStatus("▶ 정상 속도 재생 (1.0x)");
             }
         });
-
-        // ================= 롱테이크 전용 퀵 드래그 스크롤바 양방향 연동 엔진 =================
-        let isQuickScrolling = false;
-        window.isDraggingQuickScroll = false;
-        let quickScrollStartMouseY = 0;
-        let quickScrollStartHandleTop = 0;
-        let scrollRafId = null;
-
-        // 드래그 속도 향상을 위한 레이아웃 수치 캐싱 변수들
-        let cachedTrackHeight = 0;
-        let cachedHandleHeight = 0;
-        let cachedMaxHandleTop = 0;
-        let cachedCutTop = 0;
-        let cachedMaxScroll = 0;
-        let cachedActiveElement = null;
-
-        function updateQuickScrollbarHandle() {
-            const quickScrollTrack = document.getElementById('quickScrollTrack');
-            const quickScrollHandle = document.getElementById('quickScrollHandle');
-            if (!quickScrollTrack || !quickScrollHandle || isQuickScrolling) return;
-
-            const activeInfo = getActiveCut();
-            if (!activeInfo || !activeInfo.element || !activeInfo.element.classList.contains('is-preview-long-take')) {
-                quickScrollTrack.style.display = 'none';
-                return;
-            }
-
-            // getBoundingClientRect 기반으로 현재 뷰포트 내 롱테이크 이미지의 실제 노출 위치 계산
-            const containerRect = viewerScrollContainer.getBoundingClientRect();
-            const cutRect = activeInfo.element.getBoundingClientRect();
-            const containerHeight = containerRect.height || viewerScrollContainer.clientHeight || 640;
-            const cutHeight = activeInfo.element.scrollHeight || activeInfo.element.clientHeight;
-
-            // 롱테이크 이미지 전체 스크롤 가능 범위: 이미지 높이 - 뷰포트 높이
-            const totalScrollable = cutHeight - containerHeight;
-
-            let progress = 0;
-            if (totalScrollable > 0) {
-                // containerRect.top 기준으로 cutRect.top의 상대 오프셋 역산 → 현재 스크롤 진행률
-                const scrolled = containerRect.top - cutRect.top;
-                progress = Math.max(0.0, Math.min(1.0, scrolled / totalScrollable));
-            }
-
-            quickScrollTrack.style.display = 'block';
-            const trackHeight = quickScrollTrack.clientHeight;
-            const handleHeight = Math.max(30, Math.min(trackHeight - 10, (containerHeight / cutHeight) * trackHeight));
-            quickScrollHandle.style.height = `${handleHeight}px`;
-
-            const maxHandleTop = trackHeight - handleHeight;
-            const handleTop = progress * maxHandleTop;
-            quickScrollHandle.style.top = `${handleTop}px`;
-        }
-
-        // 드래그 시작 시 단 한번만 DOM 수치를 캐싱하는 헬퍼 함수
-        function startQuickScrollDrag(clientY) {
-            const activeInfo = getActiveCut();
-            if (!activeInfo || !activeInfo.element || !activeInfo.element.classList.contains('is-preview-long-take')) {
-                return false;
-            }
-
-            const quickScrollTrack = document.getElementById('quickScrollTrack');
-            const quickScrollHandle = document.getElementById('quickScrollHandle');
-            if (!quickScrollTrack || !quickScrollHandle) return false;
-
-            // [지연 원인 1] 진행 중인 programmatic scroll 애니메이션을 즉시 중단
-            // animateScrollTo가 600ms 동안 scrollTop을 덮어쓰면 드래그 입력이 무시되기 때문
-            if (window.programmaticScrollAnimId) {
-                cancelAnimationFrame(window.programmaticScrollAnimId);
-                window.programmaticScrollAnimId = null;
-                window.isSyncScrolling = false;
-            }
-
-            // [지연 원인 2] CSS scroll-behavior: smooth 가 JS scrollTop 직접 할당에도 애니메이션을 끼워 넣음
-            // 드래그 중에는 강제로 instant로 고정하여 1:1 즉각 반응 보장
-            viewerScrollContainer.style.scrollBehavior = 'auto';
-
-            // DOM 높이 및 오프셋 수치 캐싱 (getBoundingClientRect 기반으로 정밀 역산)
-            cachedActiveElement = activeInfo.element;
-            cachedTrackHeight = quickScrollTrack.clientHeight;
-            cachedHandleHeight = quickScrollHandle.clientHeight;
-            cachedMaxHandleTop = cachedTrackHeight - cachedHandleHeight;
-
-            const containerRect = viewerScrollContainer.getBoundingClientRect();
-            const cutRect = activeInfo.element.getBoundingClientRect();
-            const currentScrollTop = viewerScrollContainer.scrollTop;
-            cachedCutTop = currentScrollTop + (cutRect.top - containerRect.top);
-            const cutHeight = activeInfo.element.scrollHeight || activeInfo.element.clientHeight;
-            const containerHeight = containerRect.height || viewerScrollContainer.clientHeight || 640;
-            cachedMaxScroll = cutHeight - containerHeight;
-
-            isQuickScrolling = true;
-            window.isDraggingQuickScroll = true;
-            quickScrollStartMouseY = clientY;
-            quickScrollStartHandleTop = parseFloat(quickScrollHandle.style.top) || 0;
-
-            quickScrollHandle.classList.add('dragging');
-            document.body.style.userSelect = 'none';
-            return true;
-        }
-
-        function handleQuickScroll(clientY) {
-            if (!isQuickScrolling || !cachedActiveElement) return;
-
-            const quickScrollHandle = document.getElementById('quickScrollHandle');
-            if (!quickScrollHandle) return;
-
-            const dy = clientY - quickScrollStartMouseY;
-            let newHandleTop = quickScrollStartHandleTop + dy;
-            newHandleTop = Math.max(0, Math.min(cachedMaxHandleTop, newHandleTop));
-
-            // 핸들 위치 즉각 반영
-            quickScrollHandle.style.top = `${newHandleTop}px`;
-
-            const progress = cachedMaxHandleTop > 0 ? (newHandleTop / cachedMaxHandleTop) : 0;
-            const targetScrollTop = cachedCutTop + progress * cachedMaxScroll;
-
-            // [지연 원인 3] RAF + handleScrollUpdate() 제거 → scrollTop 직접 동기 할당
-            // 매 프레임 getActiveCut/getBoundingClientRect/syncCutActiveClasses 가 실행되면
-            // 프레임 드롭이 발생해 체감 지연이 생기므로, 드래그 중에는 scrollTop만 직접 설정
-            if (scrollRafId) { cancelAnimationFrame(scrollRafId); scrollRafId = null; }
-            viewerScrollContainer.scrollTop = targetScrollTop;
-        }
-
-        const onQuickScrollMove = (e) => {
-            if (!isQuickScrolling) return;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            handleQuickScroll(clientY);
-            if (!e.touches) {
-                e.preventDefault();
-            }
-        };
-
-        const onQuickScrollEnd = () => {
-            if (!isQuickScrolling) return;
-            isQuickScrolling = false;
-            window.isDraggingQuickScroll = false;
-            document.body.style.userSelect = '';
-
-            // [복구] 드래그 중 'auto'로 고정했던 scroll-behavior를 원래대로 복구
-            viewerScrollContainer.style.scrollBehavior = '';
-
-            const quickScrollHandle = document.getElementById('quickScrollHandle');
-            if (quickScrollHandle) {
-                quickScrollHandle.classList.remove('dragging');
-            }
-
-            window.removeEventListener('mousemove', onQuickScrollMove);
-            window.removeEventListener('mouseup', onQuickScrollEnd);
-            window.removeEventListener('touchmove', onQuickScrollMove);
-            window.removeEventListener('touchend', onQuickScrollEnd);
-
-            cachedActiveElement = null;
-
-            // 드래그 종료 후 타임라인/UI 상태 1회 동기화
-            if (typeof window.handleScrollUpdate === 'function') window.handleScrollUpdate();
-            viewerScrollContainer.dispatchEvent(new Event('scroll'));
-        };
-
-        window.addEventListener('DOMContentLoaded', () => {
-            const quickScrollHandle = document.getElementById('quickScrollHandle');
-            if (quickScrollHandle) {
-                quickScrollHandle.addEventListener('mousedown', (e) => {
-                    if (startQuickScrollDrag(e.clientY)) {
-                        window.addEventListener('mousemove', onQuickScrollMove, { passive: false });
-                        window.addEventListener('mouseup', onQuickScrollEnd);
-                        e.preventDefault();
-                        e.stopPropagation();
-                    }
-                });
-
-                quickScrollHandle.addEventListener('touchstart', (e) => {
-                    if (startQuickScrollDrag(e.touches[0].clientY)) {
-                        window.addEventListener('touchmove', onQuickScrollMove, { passive: true });
-                        window.addEventListener('touchend', onQuickScrollEnd);
-                        e.stopPropagation();
-                    }
-                }, { passive: true });
-            }
-        });
-
-        // [신규] handleScrollUpdate 함수 오버라이딩 (롱테이크 및 일반 컷 스크롤 진행률 & 타임라인 완벽 동기화)
-        window.handleScrollUpdate = function() {
-            if (!viewerScrollContainer) {
-                viewerScrollContainer = window.viewerScrollContainer = document.getElementById('viewerScrollContainer');
-            }
-            if (cuts.length === 0) return;
-
-            const scrollTop = viewerScrollContainer.scrollTop;
-            const containerHeight = viewerScrollContainer.clientHeight || 640;
-
-            let activeCutIdx;
-            if (isProgrammaticPlaying) {
-                activeCutIdx = cuts.findIndex(c => c.id === currentCutId);
-                if (activeCutIdx === -1) activeCutIdx = 0;
-            } else {
-                const activeInfo = getActiveCut();
-                activeCutIdx = activeInfo ? activeInfo.index : 0;
-            }
-
-            const activeCut = cuts[activeCutIdx];
-            if (!activeCut) return;
-            const bestCutId = activeCut.id;
-            const activeCutItem = document.getElementById(`viewerCut_${bestCutId}`);
-
-            let progress = 0;
-            if (isProgrammaticPlaying) {
-                progress = Math.max(0.0, Math.min(1.0, accumulatedTime / maxCutDuration));
-            } else {
-                if (activeCutItem && activeCutItem.classList.contains('is-preview-long-take')) {
-                    const cutTop = activeCutItem.offsetTop;
-                    const cutHeight = activeCutItem.clientHeight;
-                    const maxScroll = cutHeight - containerHeight;
-                    if (maxScroll > 0) {
-                        // 스크롤된 비율 계산 (전체 이미지 높이 대비 현재 스크롤 위치)
-                        progress = Math.max(0.0, Math.min(1.0, (scrollTop - cutTop) / maxScroll));
-                    } else {
-                        progress = 1.0;
-                    }
-                } else {
-                    const targetScrollTop = activeCutIdx * containerHeight;
-                    if (scrollTop < targetScrollTop) {
-                        if (activeCutIdx === 0) {
-                            progress = 1.0 - (scrollTop / containerHeight);
-                        } else {
-                            const prevStop = (activeCutIdx - 1) * containerHeight;
-                            progress = (scrollTop - prevStop) / containerHeight;
-                        }
-                    } else {
-                        progress = 1.0;
-                    }
-                }
-            }
-            progress = Math.max(0.0, Math.min(1.0, progress));
-
-            // [신규] 롱테이크 전용 퀵 스크롤바 표시 여부 및 핸들 위치 제어
-            const isLongTake = activeCutItem && activeCutItem.classList.contains('is-preview-long-take');
-            const quickScrollTrack = document.getElementById('quickScrollTrack');
-            if (quickScrollTrack) {
-                if (isLongTake) {
-                    quickScrollTrack.style.display = 'block';
-                    if (typeof updateQuickScrollbarHandle === 'function') {
-                        updateQuickScrollbarHandle();
-                    }
-                } else {
-                    quickScrollTrack.style.display = 'none';
-                }
-            }
-
-            if (bestCutId !== currentCutId) {
-                currentCutId = bestCutId;
-
-                const tabBtn = document.querySelector(`.cut-tab[data-cut-id="${bestCutId}"]`);
-                if (tabBtn) {
-                    document.querySelectorAll('.cut-tab').forEach(btn => btn.classList.remove('active'));
-                    tabBtn.classList.add('active');
-                }
-
-                const sceneList = document.getElementById(`sceneList_${bestCutId}`);
-                if (sceneList) {
-                    document.querySelectorAll('.cut-scene-list').forEach(list => list.classList.remove('active'));
-                    sceneList.classList.add('active');
-                }
-
-                if (typeof syncCutActiveClasses === 'function') {
-                    syncCutActiveClasses(bestCutId);
-                }
-
-                const cutEffectSelect = document.getElementById('cutEffectSelect');
-                if (cutEffectSelect) {
-                    cutEffectSelect.value = activeCut.effectType || 'none';
-                }
-                
-                if (typeof syncGlobalBgms === 'function') {
-                    syncGlobalBgms(activeCut.index);
-                }
-                
-                const cutImageName = document.getElementById('cutImageName');
-                if (cutImageName) {
-                    cutImageName.textContent = activeCut.bgImageName || '선택된 파일 없음';
-                }
-
-                window.currentCutObject = activeCut;
-                buildPlayItemsQueue(bestCutId);
-            }
-
-            if (typeof sandboxOtherCuts === 'function') {
-                sandboxOtherCuts(bestCutId);
-            }
-
-            isPlayMode = true;
-            if (!isProgrammaticPlaying && !isTimeBasedAutoplay) {
-                accumulatedTime = progress * maxCutDuration;
-            }
-
-            cuts.forEach((c, idx) => {
-                if (c.id === bestCutId) {
-                    if (typeof renderCutVisualEffects === 'function') {
-                        renderCutVisualEffects(c.id, progress, true);
-                    }
-                    
-                    if (bestCutId !== lastSettledCutId) {
-                        if (typeof syncCutBubblesState === 'function') {
-                            syncCutBubblesState(c.id, 'hide');
-                        }
-                    }
-                } else if (idx < activeCutIdx) {
-                    if (typeof renderCutVisualEffects === 'function') {
-                        renderCutVisualEffects(c.id, 1.0, true);
-                    }
-                    
-                    const settledIdx = cuts.findIndex(x => x.id === lastSettledCutId);
-                    const isMovingFromSettled = settledIdx !== -1 && Math.abs(scrollTop - settledIdx * containerHeight) > 3;
-                    
-                    if (
-                        (settledIdx !== -1 && idx <= settledIdx && isMovingFromSettled) ||
-                        c.id === lastSettledCutId || 
-                        (bestCutId !== lastSettledCutId && c.id === bestCutId)
-                    ) {
-                        if (typeof syncCutBubblesState === 'function') {
-                            syncCutBubblesState(c.id, 'hide');
-                        }
-                    } else {
-                        if (typeof syncCutBubblesState === 'function') {
-                            syncCutBubblesState(c.id, 'show');
-                        }
-                    }
-                } else {
-                    if (typeof renderCutVisualEffects === 'function') {
-                        renderCutVisualEffects(c.id, 0.0, true);
-                    }
-                    if (typeof syncCutBubblesState === 'function') {
-                        syncCutBubblesState(c.id, 'hide');
-                    }
-                }
-            });
-
-            if (!playAnimationId && typeof renderItemsFrame === 'function') {
-                renderItemsFrame();
-            }
-        };
     </script>
 </body>
 </html>

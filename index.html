@@ -324,9 +324,21 @@
         /* 컷 관리 UI */
         .cut-management { margin-bottom: 1.5rem; background: #ffffff; padding: 1rem; border-radius: 1rem; border: 1px solid var(--border-color); }
         .cut-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
-        .cut-tab { padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: #f9fafb; color: var(--text-muted); cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
+        .cut-tab { position: relative; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.9rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: #f9fafb; color: var(--text-muted); cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; }
         .cut-tab:hover { background: #e5e7eb; }
         .cut-tab.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .cut-tab-delete {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: rgba(0,0,0,0.12); border: none; cursor: pointer;
+            font-size: 11px; line-height: 1; color: inherit;
+            opacity: 0; transition: opacity 0.15s, background 0.15s;
+            flex-shrink: 0; padding: 0;
+        }
+        .cut-tab:hover .cut-tab-delete { opacity: 1; }
+        .cut-tab.active .cut-tab-delete { background: rgba(255,255,255,0.25); }
+        .cut-tab.active .cut-tab-delete:hover { background: rgba(255,255,255,0.5); }
+        .cut-tab-delete:hover { background: #ef4444 !important; color: white; }
 
         .cut-scene-list { display: none; flex-direction: column; gap: 1rem; }
         .cut-scene-list.active { display: flex; }
@@ -758,8 +770,73 @@
         var lastFrameTime = window.lastFrameTime = window.lastFrameTime || 0;           // 신규: 시간 기반 프레임 연출 갱신용 타임스탬프
         var isProgrammaticPlaying = window.isProgrammaticPlaying = window.isProgrammaticPlaying || false; // 신규: 재생(Play) 버튼을 통한 programmatic 재생 중 플래그
         var isLongTakeScrolling = window.isLongTakeScrolling = window.isLongTakeScrolling || false; // 신규: 롱테이크 스크롤 전용 상태 플래그
+        function isLongTakeCut(cutId) {
+            const cutItem = document.getElementById(`viewerCut_${cutId}`);
+            return !!(cutItem && cutItem.classList.contains('is-preview-long-take'));
+        }
+        function getDialogueTimingType(cutId, data = null) {
+            // 롱테이크 컷이면 무조건 'scroll' 강제 (기존 데이터 무시)
+            if (isLongTakeCut(cutId)) return 'scroll';
+            if (data && data.timingType) return data.timingType;
+            return 'time';
+        }
+        function getCurrentScrollTriggerY(cutId) {
+            const cutItem = document.getElementById(`viewerCut_${cutId}`);
+            if (!cutItem || !viewerScrollContainer) return 0;
+            const containerHeight = viewerScrollContainer.clientHeight || 640;
+            const markerY = viewerScrollContainer.scrollTop + containerHeight * 0.5;
+            const relativeY = markerY - cutItem.offsetTop;
+            const cutHeight = cutItem.scrollHeight || cutItem.clientHeight || containerHeight;
+            return Math.max(0, Math.min(cutHeight, relativeY));
+        }
+        function applyDialogueTimingUI(card) {
+            const timingType = card.dataset.timingType || 'time';
+            const isScrollMode = timingType === 'scroll';
+            const startInput = card.querySelector('.diag-start');
+            const durationInput = card.querySelector('.diag-duration');
+            const timeline = card.querySelector('.timeline-container');
+            const scrollPanel = card.querySelector('.diag-scroll-panel');
+            const scrollValue = card.querySelector('.diag-scroll-y-value');
+
+            if (startInput) startInput.disabled = isScrollMode;
+            if (durationInput) durationInput.disabled = isScrollMode;
+            if (timeline) {
+                timeline.style.opacity = isScrollMode ? '0.45' : '';
+                timeline.style.pointerEvents = isScrollMode ? 'none' : '';
+            }
+            if (scrollPanel) scrollPanel.style.display = isScrollMode ? 'flex' : 'none';
+            if (scrollValue) scrollValue.textContent = `${(parseFloat(card.dataset.scrollY) || 0).toFixed(0)}px`;
+        }
 
         // [성능 개선 2 - 데이터 동기화 헬퍼 함수]
+        function syncSceneListVisibility(activeCutId) {
+            document.querySelectorAll('.cut-scene-list').forEach(list => {
+                const isActive = list.id === `sceneList_${activeCutId}`;
+                list.classList.toggle('active', isActive);
+                list.style.display = isActive ? '' : 'none';
+            });
+
+            document.querySelectorAll('.dialogue-item, .sfx-item').forEach(card => {
+                const ownerCutId = card.dataset.cutId || (card.closest('.cut-scene-list')?.id || '').replace('sceneList_', '');
+                const isActive = ownerCutId === activeCutId;
+                if (ownerCutId && card.dataset.cutId !== ownerCutId) {
+                    card.dataset.cutId = ownerCutId;
+                }
+                card.style.display = isActive ? '' : 'none';
+            });
+        }
+        function forceScrollBubbleHidden(bubble) {
+            if (!bubble || bubble.dataset.timingType !== 'scroll') return;
+            bubble.classList.remove('show');
+            bubble.classList.add('animate');
+            bubble.style.opacity = '0';
+            bubble.style.pointerEvents = 'none';
+            const tailSvg = bubble.querySelector('.tail-svg');
+            const paths = bubble.querySelectorAll('.bubble-path');
+            if (tailSvg) tailSvg.style.opacity = '0';
+            paths.forEach(path => path.style.opacity = '0');
+        }
+
         function updateCutItemData(cutId, itemId, updatedProperties) {
             const cut = cuts.find(c => c.id === cutId);
             if (!cut) return;
@@ -872,8 +949,23 @@
                 // 탭 버튼 생성
                 const tabBtn = document.createElement('button');
                 tabBtn.className = 'cut-tab';
-                tabBtn.textContent = `컷 ${cutData.index}`;
                 tabBtn.dataset.cutId = cutId;
+
+                const tabLabel = document.createElement('span');
+                tabLabel.className = 'cut-tab-label';
+                tabLabel.textContent = `컷 ${cutData.index}`;
+                tabBtn.appendChild(tabLabel);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'cut-tab-delete';
+                deleteBtn.title = '이 컷 삭제';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // 탭 선택 이벤트 차단
+                    deleteCut(cutId);
+                });
+                tabBtn.appendChild(deleteBtn);
+
                 tabBtn.addEventListener('click', () => selectCut(cutId, true));
                 cutTabs.appendChild(tabBtn);
 
@@ -906,6 +998,54 @@
                 throw err;
             }
         }
+
+        // ================= 컷 삭제 =================
+        function deleteCut(cutId) {
+            if (cuts.length <= 1) {
+                showStatus('⚠️ 마지막 컷은 삭제할 수 없습니다.');
+                return;
+            }
+
+            const cutIdx = cuts.findIndex(c => c.id === cutId);
+            if (cutIdx === -1) return;
+
+            // 삭제 전 포커스 이동 대상 결정 (이전 컷 우선, 없으면 다음 컷)
+            const nextCutId = (cutIdx > 0)
+                ? cuts[cutIdx - 1].id
+                : cuts[cutIdx + 1].id;
+
+            // 1. cuts 배열에서 제거
+            cuts.splice(cutIdx, 1);
+
+            // 2. 탭 버튼 제거
+            const tabBtn = cutTabs.querySelector(`.cut-tab[data-cut-id="${cutId}"]`);
+            if (tabBtn) tabBtn.remove();
+
+            // 3. 씬 리스트(대사/효과음 카드) 제거
+            const sceneList = document.getElementById(`sceneList_${cutId}`);
+            if (sceneList) sceneList.remove();
+
+            // 4. 뷰어 컷 아이템(이미지 + 버블) 제거
+            const cutItem = document.getElementById(`viewerCut_${cutId}`);
+            if (cutItem) cutItem.remove();
+
+            // 5. 남은 탭 번호 재번호화 (컷 1, 컷 2, ...)
+            cuts.forEach((c, i) => {
+                c.index = i + 1;
+                const tab = cutTabs.querySelector(`.cut-tab[data-cut-id="${c.id}"]`);
+                if (tab) {
+                    const label = tab.querySelector('.cut-tab-label');
+                    if (label) label.textContent = `컷 ${i + 1}`;
+                }
+            });
+
+            // 6. 인접 컷으로 포커스 이동 + 뷰어 스냅 동기화
+            selectCut(nextCutId, false);
+            updateScrollSnapState();
+
+            showStatus(`🗑️ 컷이 삭제되었습니다. (남은 컷: ${cuts.length}개)`);
+        }
+
 
         function syncCutActiveClasses(cutId) {
             cuts.forEach(c => {
@@ -1031,6 +1171,7 @@
                 document.querySelectorAll('.cut-scene-list').forEach(list => {
                     list.classList.toggle('active', list.id === `sceneList_${cutId}`);
                 });
+                syncSceneListVisibility(cutId);
 
                 // 3. 우측 뷰어 내 활성화 클래스 적용 및 연출 애니메이션 발동
                 syncCutActiveClasses(cutId);
@@ -1125,7 +1266,9 @@
                             lastSettledCutId = cutId; // 버튼 전환 완료 시 Settled ID 동기화
                             
                             // [요청 3] 안착 후 (animateScrollTo 완료 직후) 비로소 show 클래스 부여하는 구조로 순서 재조정
+                            // 단, scroll 타입 말풍선은 스크롤 위치 기반으로 제어되므로 제외
                             targetItem.querySelectorAll('.speech-bubble').forEach(bubble => {
+                                if (bubble.dataset.timingType === 'scroll') return; // 스크롤 타입은 건너뜀
                                 bubble.style.transition = 'none';
                                 bubble.classList.remove('animate');
                                 bubble.classList.add('show');
@@ -1162,7 +1305,9 @@
                         lastSettledCutId = cutId; // 즉시 이동 시에도 Settled ID 동기화
                         
                         // [요청 3] scrollTop 변경 직후 비로소 show 클래스 부여하는 구조로 순서 재조정
+                        // 단, scroll 타입 말풍선은 스크롤 위치 기반으로 제어되므로 제외
                         targetItem.querySelectorAll('.speech-bubble').forEach(bubble => {
+                            if (bubble.dataset.timingType === 'scroll') return; // 스크롤 타입은 건너뜀
                             bubble.style.transition = 'none';
                             bubble.classList.remove('animate');
                             bubble.classList.add('show');
@@ -1333,11 +1478,93 @@
             }
         }
 
+        // [롱테이크 전용] 해당 컷이 롱테이크로 확정될 때 왼쪽 패널의 대사 카드 타이밍 UI를 일괄 잠금 처리.
+        // timingType을 'scroll'로 강제 주입하고, 시간 입력창/슬라이더를 disabled 처리한다.
+        // 또한 이미 화면에 노출된 말풍선을 즐시 감춰서 스크롤 트리거 전까지 숨김 상태를 보장한다.
+        function applyLongTakeDialogueMode(cutId) {
+            if (!cutId) return;
+            const cutItem = document.getElementById(`viewerCut_${cutId}`);
+            const isLongTake = cutItem && cutItem.classList.contains('is-preview-long-take');
+            const sceneList = document.getElementById(`sceneList_${cutId}`);
+            if (!sceneList) return;
+
+            sceneList.querySelectorAll('.dialogue-item').forEach(card => {
+                // timingType 강제 'scroll' 주입
+                card.dataset.timingType = 'scroll';
+                const bubble = card.bubbleDOM;
+                if (bubble) bubble.dataset.timingType = 'scroll';
+
+                // cuts 데이터에도 반영
+                const itemId = card.dataset.id;
+                if (typeof updateCutItemData === 'function') {
+                    updateCutItemData(cutId, itemId, { timingType: 'scroll', isShown: false });
+                }
+
+                // UI: 타이밍 입력창 및 슬라이더 disabled 처리
+                if (isLongTake) {
+                    const startInput = card.querySelector('.diag-start');
+                    const durationInput = card.querySelector('.diag-duration');
+                    const timeline = card.querySelector('.timeline-container');
+                    const scrollPanel = card.querySelector('.diag-scroll-panel');
+
+                    if (startInput) startInput.disabled = true;
+                    if (durationInput) durationInput.disabled = true;
+                    if (timeline) {
+                        timeline.style.opacity = '0.45';
+                        timeline.style.pointerEvents = 'none';
+                    }
+                    if (scrollPanel) scrollPanel.style.display = 'flex';
+
+                    // [핵심 교정] 롱테이크 확정 시 이미 화면에 노출된 말풍선을
+                    // 즉시 transition:none으로 opacity:0 + .animate 상태로 강제 초기화한다.
+                    // 이로 써 스크롤 트리거 전까지 절대 화면에 디스플레이되지 않는다.
+                    if (bubble) {
+                        const tailSvg = bubble.querySelector('.tail-svg');
+                        const paths = bubble.querySelectorAll('.bubble-path');
+                        const spans = bubble.querySelectorAll('.typing-wrapper span');
+
+                        bubble.style.transition = 'none';
+                        if (tailSvg) tailSvg.style.transition = 'none';
+                        paths.forEach(p => p.style.transition = 'none');
+
+                        bubble.classList.remove('animate');
+                        bubble.classList.add('show');
+                        bubble.style.opacity = '1';
+                        bubble.style.pointerEvents = '';
+                        if (tailSvg) tailSvg.style.opacity = '1';
+                        paths.forEach(p => p.style.opacity = '1');
+                        spans.forEach(s => s.style.opacity = '1');
+                        bubble.lastOpacity = '1';
+                        bubble.lastSpansToShow = spans.length;
+
+                        void bubble.offsetWidth; // Reflow 확정
+
+                        // transition 복원 (CSS bounce가 트리거될 때 살아있도록)
+                        bubble.style.transition = '';
+                        bubble.style.opacity = ''; // CSS .animate 규칙으로을 준수하도록 인라인 제거
+                        if (tailSvg) tailSvg.style.transition = '';
+                        paths.forEach(p => p.style.transition = '');
+                    }
+                } else {
+                    // 일반 컷으로 바뀌었을 때 UI 복원
+                    if (typeof applyDialogueTimingUI === 'function') {
+                        applyDialogueTimingUI(card);
+                    }
+                }
+            });
+        }
+
         // 우측 뷰어 스크롤 감지 및 제어 연동 (명명된 함수 handleScroll로 분리)
         function handleScroll(e) {
             if (isLongTakeScrolling) {
                 // 롱테이크 내부 스크롤 중에도 퀵 스크롤바 핸들 위치는 실시간 갱신
                 if (typeof updateQuickScrollbarHandle === 'function') updateQuickScrollbarHandle();
+                // 롱테이크 내부 스크롤 중에도 스크롤 위치 기반 말풍선 트리거 실시간 갱신
+                if (typeof updateScrollTriggeredDialogues === 'function') {
+                    const _st = viewerScrollContainer.scrollTop;
+                    const _ch = viewerScrollContainer.clientHeight || 640;
+                    updateScrollTriggeredDialogues(_st, _ch);
+                }
                 return;
             }
             if (cuts.length === 0) return;
@@ -1437,11 +1664,28 @@
                     
                     // 활성 컷이 실제로 변경된 경우에만 0.0초 시점부터 시네마틱 자동 재생
                     if (settledCutId !== lastSettledCutId) {
-                        isTimeBasedAutoplay = true;
-                        accumulatedTime = 0.0;
                         lastSettledCutId = settledCutId;
                         currentCutId = settledCutId; // 명시적 싱크
-                        triggerAutoplayForCurrentCut();
+
+                        // [롱테이크 분리] 롱테이크 컷 안착 시 시간 기반 자동재생 완전 차단.
+                        // 스크롤 연출 제어권을 updateScrollTriggeredDialogues에 100% 넘긴다.
+                        const settledCutEl = document.getElementById(`viewerCut_${settledCutId}`);
+                        const settledIsLongTake = settledCutEl && settledCutEl.classList.contains('is-preview-long-take');
+
+                        if (settledIsLongTake) {
+                            // 롱테이크: 시간 기반 재생 플래그를 올리지 않고 스크롤 트리거만 실행
+                            isTimeBasedAutoplay = false;
+                            if (typeof updateScrollTriggeredDialogues === 'function') {
+                                const _st = viewerScrollContainer.scrollTop;
+                                const _ch = viewerScrollContainer.clientHeight || 640;
+                                updateScrollTriggeredDialogues(_st, _ch);
+                            }
+                        } else {
+                            // 일반 컷: 기존 시간 기반 시네마틱 자동 재생
+                            isTimeBasedAutoplay = true;
+                            accumulatedTime = 0.0;
+                            triggerAutoplayForCurrentCut();
+                        }
                     } else {
                         // [개선] 자동 재생 연출(isTimeBasedAutoplay)이 이미 성공적으로 시작되어 돌고 있는 동안에는,
                         // 미세 잔여 스냅 안착 판정에 의해 restoreEditMode()가 조기에 강제 소환되는 것을 철저히 격리합니다!
@@ -1662,6 +1906,9 @@
                             if (cutItem) {
                                 renderCutLayers(cutItem, cut);
                             }
+                            // [롱테이크 감지] 이미지 로드 완료 직후 롱테이크 여부를 판단하여
+                            // 대사 카드 timingType 강제 주입 및 타이밍 UI 잠금 처리
+                            requestAnimationFrame(() => applyLongTakeDialogueMode(currentCutId));
                             showStatus(`컷 ${cut.index} 레이어 ${layerIndex} 로드 완료!`);
                         };
                         img.onerror = function() {
@@ -1691,6 +1938,8 @@
                         if (cutItem) {
                             renderCutLayers(cutItem, cut);
                         }
+                        // 비디오는 롱테이크가 될 수 없으나 일관성을 위해 모드 갱신
+                        requestAnimationFrame(() => applyLongTakeDialogueMode(currentCutId));
                         showStatus(`컷 ${cut.index} 레이어 ${layerIndex} 로드 완료!`);
                     }
                 }
@@ -1804,7 +2053,7 @@
                         }
                         // [데이터 동기화]
                         const itemId = card.dataset.id;
-                        updateCutItemData(currentCutId, itemId, {
+                        updateCutItemData(card.dataset.cutId || currentCutId, itemId, {
                             audioUrl: card.audioUrl,
                             duration: tempAudio.duration
                         });
@@ -1965,27 +2214,58 @@
 
         // ================= 대사 관리 (음성 오디오 통합) =================
         function addDialogue(defaultData = null) {
+            const ownerCutId = currentCutId;
             // 대사 추가 시 즉시 재생을 중지하고 편집 모드로 복구하여 편집 락을 해제합니다.
             restoreEditMode();
+            if (!ownerCutId) return null;
 
             const id = `item_${itemCounter++}`;
             const card = document.createElement('div');
             card.className = 'card dialogue-item';
             card.dataset.id = id;
+            card.dataset.cutId = ownerCutId;
             
-            const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
+            const activeSceneList = document.getElementById(`sceneList_${ownerCutId}`);
+            // [현재 뷰어 중앙 위치 계산] 대사 추가 시 현재 화면에 보이는 중앙 지점에 말풍선 배치
+            const _calcDefaultPosition = () => {
+                const cutItem = document.getElementById(`viewerCut_${ownerCutId}`);
+                const container = viewerScrollContainer || document.getElementById('viewerScrollContainer');
+                if (!cutItem || !container) return { x: 10, y: 20 };
+
+                const containerH = container.clientHeight || 640;
+                const containerW = container.clientWidth || 390;
+                // 현재 뷰어 화면 중앙의 절대 Y 좌표
+                const viewCenterAbsY = container.scrollTop + containerH * 0.5;
+                // 컷 기준 상대 Y 좌표 (px)
+                const cutOffsetTop = cutItem.offsetTop;
+                const cutH = cutItem.scrollHeight || cutItem.clientHeight || containerH;
+                const cutW = cutItem.clientWidth || containerW;
+                // 컷 내 상대 y를 퍼센트로 변환 (0~100)
+                const relY = viewCenterAbsY - cutOffsetTop;
+                const yPct = Math.max(5, Math.min(85, (relY / cutH) * 100));
+                // x는 화면 왼쪽 20% 지점에 고정 배치
+                const xPct = 50;
+                return { x: xPct, y: Math.round(yPct) };
+            };
+            const _pos = _calcDefaultPosition();
             const data = defaultData || {
                 charName: "캐릭터", charColor: "#ffffff", text: "",
                 start: "0.5", duration: "2.0",
-                x: "10", y: String(20 + (activeSceneList ? activeSceneList.children.length * 20 : 0)),
+                x: String(_pos.x), y: String(_pos.y),
                 baseAngle: 45, tipDx: 40, tipDy: 40,
                 baseWidth: 14
             };
+
+            data.timingType = getDialogueTimingType(ownerCutId, data);
+            data.scrollY = Number.isFinite(parseFloat(data.scrollY)) ? parseFloat(data.scrollY) : getCurrentScrollTriggerY(ownerCutId);
+            data.isShown = false;
 
             card.dataset.baseAngle = data.baseAngle;
             card.dataset.tipDx = data.tipDx;
             card.dataset.tipDy = data.tipDy;
             card.dataset.baseWidth = data.baseWidth || 14;
+            card.dataset.timingType = data.timingType;
+            card.dataset.scrollY = data.scrollY;
 
             card.innerHTML = `
                 <div class="card-header">
@@ -2054,15 +2334,25 @@
                     <div><label>위치 X (%)</label><input type="number" class="diag-x" value="${data.x}" step="0.1" min="0" max="100"></div>
                     <div><label>위치 Y (%)</label><input type="number" class="diag-y" value="${data.y}" step="0.1" min="0" max="100"></div>
                 </div>
+                <div class="form-row diag-scroll-panel" style="display:none; align-items:center; gap:0.5rem; background:#eef2ff; padding:0.5rem; border-radius:0.5rem;">
+                    <div style="flex:1; font-size:0.75rem; color:#4338ca; font-weight:700;">Scroll trigger Y: <span class="diag-scroll-y-value">0px</span></div>
+                    <button type="button" class="btn-small diag-save-scroll-y">현재 스크롤 위치 저장</button>
+                </div>
             `;
             if (activeSceneList) activeSceneList.appendChild(card);
             handleAudioUpload(card.querySelector('.item-audio-file'), card, '.diag-duration');
             initTimelineSlider(card); // 타임라인 드래그 기능 기동
+            applyDialogueTimingUI(card);
 
             const bubble = document.createElement('div');
+            // 롱테이크 컷이면 처음부터 .animate(숨김) 상태로 생성하여 스크롤 트리거 전 노출을 원천 차단.
+            // 일반 컷은 편집 편의를 위해 .show selected 상태로 생성한다.
+            const _isCreatingForLongTake = isLongTakeCut(ownerCutId);
             bubble.className = 'speech-bubble show selected';
-            bubble.style.opacity = ''; // 인라인 opacity 초기화로 CSS 규칙 적용 보장
+            bubble.style.opacity = ''; // CSS 규칙으로 제어
             bubble.dataset.cardId = id;
+            bubble.dataset.timingType = data.timingType;
+            bubble.dataset.cutId = ownerCutId;
             bubble.innerHTML = `
                 <div class="bubble-shadow-layer"></div>
                 <div class="bubble-bg-cover"></div>
@@ -2075,7 +2365,7 @@
             `;
             
             document.querySelectorAll('.speech-bubble').forEach(b => b.classList.remove('selected'));
-            const activeBubbleContainer = document.getElementById(`bubbleContainer_${currentCutId}`);
+            const activeBubbleContainer = document.getElementById(`bubbleContainer_${ownerCutId}`);
             if (activeBubbleContainer) activeBubbleContainer.appendChild(bubble);
 
             const updateBubbleUI = () => {
@@ -2088,15 +2378,20 @@
                 const y = card.querySelector('.diag-y').value;
                 const start = parseFloat(card.querySelector('.diag-start').value) || 0.0;
                 const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
+                const timingType = card.dataset.timingType || 'time';
+                const scrollY = parseFloat(card.dataset.scrollY) || 0.0;
 
                 // [데이터 동기화]
-                updateCutItemData(currentCutId, id, {
+                updateCutItemData(ownerCutId, id, {
                     type: 'dialogue',
+                    timingType: timingType,
                     charName: cName,
                     charColor: color,
                     text: text,
                     start: start,
                     duration: duration,
+                    scrollY: scrollY,
+                    isShown: false,
                     x: parseFloat(x) || 0.0,
                     y: parseFloat(y) || 0.0,
                     baseAngle: parseFloat(card.dataset.baseAngle) || 45,
@@ -2116,29 +2411,50 @@
             };
 
             card.querySelectorAll('input, textarea').forEach(input => input.addEventListener('input', updateBubbleUI));
+            const saveScrollButton = card.querySelector('.diag-save-scroll-y');
+            if (saveScrollButton) {
+                saveScrollButton.addEventListener('click', () => {
+                    restoreEditMode();
+                    card.dataset.scrollY = getCurrentScrollTriggerY(ownerCutId);
+                    applyDialogueTimingUI(card);
+                    updateBubbleUI();
+                    showStatus("현재 스크롤 위치를 대사 트리거 좌표로 저장했습니다.");
+                });
+            }
             card.addEventListener('mousedown', () => { document.querySelectorAll('.speech-bubble').forEach(b => b.classList.remove('selected')); bubble.classList.add('selected'); });
             card.querySelector('.diag-delete-btn').addEventListener('click', () => { 
                 resizeObserver.unobserve(bubble); 
                 card.remove(); 
                 bubble.remove(); 
-                deleteCutItemData(currentCutId, id);
+                deleteCutItemData(ownerCutId, id);
             });
 
             updateBubbleUI();
             card.bubbleDOM = bubble;
             resizeObserver.observe(bubble);
+            syncSceneListVisibility(ownerCutId);
+
+            // [롱테이크 연동] 카드 생성 직후 현재 컷이 롱테이크인 경우 즉시 타이밍 UI 잠금 처리
+            // (새 대사 추가 시에도 timingType='scroll' 강제 주입이 즉각 발동)
+            if (typeof applyLongTakeDialogueMode === 'function') {
+                requestAnimationFrame(() => applyLongTakeDialogueMode(ownerCutId));
+            }
+
             return card;
         }
 
         // ================= 효과음(SFX) 전용 카드 =================
         function addSFX() {
+            const ownerCutId = currentCutId;
             // 효과음 추가 시 즉시 재생을 중지하고 편집 모드로 복구하여 편집 락을 해제합니다.
             restoreEditMode();
+            if (!ownerCutId) return null;
 
             const id = `item_${itemCounter++}`;
             const card = document.createElement('div');
             card.className = 'card sfx-item';
             card.dataset.id = id;
+            card.dataset.cutId = ownerCutId;
             card.innerHTML = `
                 <div class="card-header">
                     <span style="color:#ef4444;">💥 효과음 (SFX)</span>
@@ -2177,7 +2493,7 @@
                     </div>
                 </div>
             `;
-            const activeSceneList = document.getElementById(`sceneList_${currentCutId}`);
+            const activeSceneList = document.getElementById(`sceneList_${ownerCutId}`);
             if (activeSceneList) activeSceneList.appendChild(card);
             handleAudioUpload(card.querySelector('.item-audio-file'), card, '.diag-duration');
             initTimelineSlider(card); // 타임라인 드래그 기능 기동
@@ -2188,7 +2504,7 @@
                 const duration = parseFloat(card.querySelector('.diag-duration').value) || 2.0;
 
                 // [데이터 동기화]
-                updateCutItemData(currentCutId, id, {
+                updateCutItemData(ownerCutId, id, {
                     type: 'sfx',
                     name: sfxName,
                     start: start,
@@ -2200,10 +2516,12 @@
             card.querySelectorAll('input').forEach(input => input.addEventListener('input', updateSfxUI));
             card.querySelector('.diag-delete-btn').addEventListener('click', () => { 
                 card.remove(); 
-                deleteCutItemData(currentCutId, id);
+                deleteCutItemData(ownerCutId, id);
             });
             
             updateSfxUI();
+            syncSceneListVisibility(ownerCutId);
+            return card;
         }
 
         // ================= 글로벌 BGM 오디오 관리 상태 및 제어 함수 =================
@@ -2558,7 +2876,7 @@
 
             // [데이터 동기화] 드래그 등으로 변경된 꼬리 기하 속성을 메모리 데이터에도 연동
             if (typeof updateCutItemData === 'function') {
-                updateCutItemData(currentCutId, cardId, {
+                updateCutItemData(card.dataset.cutId || bubble.dataset.cutId || currentCutId, cardId, {
                     baseAngle: baseAngle,
                     tipDx: tipDx,
                     tipDy: tipDy,
@@ -2897,41 +3215,64 @@
                     const paths = bubble.querySelectorAll('.bubble-path');
                     
                     if (belongsToCurrentCut) {
-                        // 활성 컷 말풍선 및 하위 요소들 transition 임시 비활성화 후 opacity 복원
-                        bubble.style.transition = 'none';
-                        bubble.style.opacity = '1';
-                        if (tailSvg) {
-                            tailSvg.style.transition = 'none';
-                            tailSvg.style.opacity = '1';
-                        }
-                        if (paths.length > 0) {
-                            paths.forEach(path => {
-                                path.style.transition = 'none';
-                                path.style.opacity = '1';
-                            });
-                        }
-                        
-                        bubble.classList.add('show');
-                        const textLayer = bubble.querySelector('.bubble-text-layer');
-                        if (textLayer) {
-                            const originalText = card.querySelector('.diag-text').value;
-                            textLayer.textContent = originalText || '(대사 대기중)';
-                        }
-                        
-                        void bubble.offsetWidth; // Reflow 강제 적용
-                        
-                        // 원래 transition 복구 및 인라인 opacity 리셋(CSS 스타일 우선순위 유지)
-                        bubble.style.transition = '';
-                        bubble.style.opacity = '';
-                        if (tailSvg) {
-                            tailSvg.style.transition = '';
-                            tailSvg.style.opacity = '';
-                        }
-                        if (paths.length > 0) {
-                            paths.forEach(path => {
-                                path.style.transition = '';
-                                path.style.opacity = '';
-                            });
+                        // [핵심 교정] 롱테이크 컷의 scroll 타입 말풍선은 편집 모드 복귀 시에도 숨김 유지.
+                        // 스크롤 중앙 트리거 시점에만 updateScrollTriggeredDialogues가 표시한다.
+                        const isScrollBubble = bubble.dataset.timingType === 'scroll';
+                        const parentCutEl = document.getElementById(`viewerCut_${currentCutId}`);
+                        const parentIsLongTake = parentCutEl && parentCutEl.classList.contains('is-preview-long-take');
+
+                        if (isScrollBubble && parentIsLongTake) {
+                            // 롱테이크 scroll 타입: 스크롤 트리거 전까지 완전 은폐
+                            bubble.style.transition = 'none';
+                            bubble.classList.remove('animate');
+                            bubble.classList.add('show');
+                            bubble.style.opacity = '1';
+                            bubble.style.pointerEvents = '';
+                            if (tailSvg) { tailSvg.style.transition = 'none'; tailSvg.style.opacity = '1'; }
+                            paths.forEach(p => { p.style.transition = 'none'; p.style.opacity = '1'; });
+                            bubble.lastOpacity = '1';
+                            void bubble.offsetWidth; // Reflow
+                            bubble.style.transition = '';
+                            bubble.style.opacity = ''; // CSS .animate 규칙에 위임
+                            if (tailSvg) tailSvg.style.transition = '';
+                            paths.forEach(p => p.style.transition = '');
+                        } else {
+                            // 활성 컷 일반 말풍선: 편집 모드에서 opacity 복원
+                            bubble.style.transition = 'none';
+                            bubble.style.opacity = '1';
+                            if (tailSvg) {
+                                tailSvg.style.transition = 'none';
+                                tailSvg.style.opacity = '1';
+                            }
+                            if (paths.length > 0) {
+                                paths.forEach(path => {
+                                    path.style.transition = 'none';
+                                    path.style.opacity = '1';
+                                });
+                            }
+                            
+                            bubble.classList.add('show');
+                            const textLayer = bubble.querySelector('.bubble-text-layer');
+                            if (textLayer) {
+                                const originalText = card.querySelector('.diag-text').value;
+                                textLayer.textContent = originalText || '(대사 대기중)';
+                            }
+                            
+                            void bubble.offsetWidth; // Reflow 강제 적용
+                            
+                            // 원래 transition 복구 및 인라인 opacity 리셋(CSS 스타일 우선순위 유지)
+                            bubble.style.transition = '';
+                            bubble.style.opacity = '';
+                            if (tailSvg) {
+                                tailSvg.style.transition = '';
+                                tailSvg.style.opacity = '';
+                            }
+                            if (paths.length > 0) {
+                                paths.forEach(path => {
+                                    path.style.transition = '';
+                                    path.style.opacity = '';
+                                });
+                            }
                         }
                     } else {
                         // 비활성 컷 말풍선들은 완벽히 은폐하고 opacity = 0으로 잠금
@@ -3028,6 +3369,14 @@
             
             const cutIdx = cuts.findIndex(c => c.id === currentCutId);
             if (cutIdx === -1) return;
+
+            // [롱테이크 분리] 현재 컷이 롱테이크이면 시간 기반 재생 루프를 완전히 차단하고
+            // 스크롤 연출 모드로 안내한다. 롱테이크 대사는 오직 스크롤 이벤트만이 트리거한다.
+            const activeCutEl = document.getElementById(`viewerCut_${currentCutId}`);
+            if (activeCutEl && activeCutEl.classList.contains('is-preview-long-take')) {
+                showStatus("🎞️ 롱테이크 컷은 미리보기 뷰어를 직접 스크롤하여 대사를 확인하세요.");
+                return;
+            }
 
             const itemsCount = buildPlayItemsQueue(currentCutId);
             if (itemsCount === 0) {
@@ -3127,8 +3476,11 @@
                             charColor: item.charColor || "#ffffff",
                             text: item.text || "",
                             audioUrl: item.audioUrl || "",
+                            timingType: item.timingType || "time",
                             start: parseFloat(item.start) || 0.0,
                             duration: parseFloat(item.duration) || 2.0,
+                            scrollY: parseFloat(item.scrollY) || 0.0,
+                            isShown: false,
                             x: parseFloat(item.x) || 10.0,
                             y: parseFloat(item.y) || 20.0,
                             baseAngle: parseFloat(item.baseAngle) || 45,
@@ -3203,7 +3555,8 @@
         // ================= 초기 샘플 데이터 =================
         window.addEventListener('DOMContentLoaded', () => {
             createCut();
-            addDialogue({ charName: "주인공", charColor: "#ffffff", text: "다중 컷 편집기 가동 시작!", start: "0.5", duration: "1.5", x: "15", y: "20", baseAngle: 60, tipDx: 50, tipDy: 50 });
+            // [기획 수정] 롱테이크 컷 업로드 시 자동 배치 대사가 불필요하므로 초기 샘플 대사 제거.
+            // 사용자가 직접 '+ 대사 추가' 버튼으로 추가한다.
             
             // [초기 상태 지정] 최초 로드된 1컷 ID를 Settled 캐시에 등록
             if (cuts.length > 0) {
@@ -3391,6 +3744,11 @@
             // 프레임 드롭이 발생해 체감 지연이 생기므로, 드래그 중에는 scrollTop만 직접 설정
             if (scrollRafId) { cancelAnimationFrame(scrollRafId); scrollRafId = null; }
             viewerScrollContainer.scrollTop = targetScrollTop;
+
+            // 스크롤 위치 기반 말풍선 트리거 경량 업데이트 (드래그 중에도 실시간 반영)
+            if (typeof updateScrollTriggeredDialogues === 'function') {
+                updateScrollTriggeredDialogues(targetScrollTop, viewerScrollContainer.clientHeight || 640);
+            }
         }
 
         const onQuickScrollMove = (e) => {
@@ -3531,6 +3889,7 @@
                 if (sceneList) {
                     document.querySelectorAll('.cut-scene-list').forEach(list => list.classList.remove('active'));
                     sceneList.classList.add('active');
+                    syncSceneListVisibility(bestCutId);
                 }
 
                 if (typeof syncCutActiveClasses === 'function') {
@@ -3606,7 +3965,18 @@
                 }
             });
 
-            if (!playAnimationId && typeof renderItemsFrame === 'function') {
+            // [신규] 스크롤 위치 기반 롱테이크 말풍선 트리거 (scroll timingType 전용)
+            if (typeof updateScrollTriggeredDialogues === 'function') {
+                const _scrollTop = viewerScrollContainer.scrollTop;
+                const _containerH = viewerScrollContainer.clientHeight || 640;
+                updateScrollTriggeredDialogues(_scrollTop, _containerH);
+            }
+
+            // [롱테이크 분리] 현재 활성 컷이 롱테이크이면 시간 기반 renderItemsFrame 루프를 원천 차단한다.
+            // 롱테이크 대사 연출 제어권은 updateScrollTriggeredDialogues가 100% 전담한다.
+            const _activeCutElForRender = document.getElementById(`viewerCut_${bestCutId}`);
+            const _isActiveLongTake = _activeCutElForRender && _activeCutElForRender.classList.contains('is-preview-long-take');
+            if (!_isActiveLongTake && !playAnimationId && typeof renderItemsFrame === 'function') {
                 renderItemsFrame();
             }
         };

@@ -562,6 +562,8 @@ function handleScrollUpdate() {
         }
     });
 
+    updateScrollTriggeredDialogues(scrollTop, containerHeight);
+
     if (!playAnimationId) {
         renderItemsFrame();
     }
@@ -655,6 +657,9 @@ function syncCutBubblesState(cutId, state) {
     cards.forEach(card => {
         const bubble = card.bubbleDOM;
         if (bubble) {
+            if (state === 'show' && bubble.dataset.timingType === 'scroll') {
+                return;
+            }
             const tailSvg = bubble.querySelector('.tail-svg');
             const paths = bubble.querySelectorAll('.bubble-path');
             
@@ -813,6 +818,12 @@ function renderItemsFrame() {
         } 
         else {
             item.triggered = true;
+
+            // [롱테이크 원천 차단] scroll 타입 대사는 renderItemsFrame이 절대 건드리지 않는다.
+            // 연출 제어권은 100% triggerScrollDialogueAnimation이 전담한다.
+            if (item.timingType === 'scroll' || (bubble && bubble.dataset && bubble.dataset.timingType === 'scroll')) {
+                return;
+            }
             
             if (bubble) {
                 const tailSvg = bubble.querySelector('.tail-svg');
@@ -923,6 +934,152 @@ function renderItemsFrame() {
     }
 }
 window.renderItemsFrame = renderItemsFrame;
+
+function setBubbleShownForScroll(bubble, shown) {
+    if (!bubble) return;
+    const tailSvg = bubble.querySelector('.tail-svg');
+    const paths = bubble.querySelectorAll('.bubble-path');
+    const opacity = shown ? '1' : '0';
+
+    bubble.style.transition = shown ? '' : 'none';
+    bubble.style.opacity = opacity;
+    bubble.classList.toggle('show', shown);
+    bubble.classList.toggle('animate', !shown);
+    if (tailSvg) {
+        tailSvg.style.transition = shown ? '' : 'none';
+        tailSvg.style.opacity = opacity;
+    }
+    paths.forEach(path => {
+        path.style.transition = shown ? '' : 'none';
+        path.style.opacity = opacity;
+    });
+
+    const spans = bubble.querySelectorAll('.typing-wrapper span');
+    spans.forEach(span => span.style.opacity = opacity);
+    bubble.lastOpacity = opacity;
+    if (!shown) bubble.lastSpansToShow = 0;
+}
+
+function findDialogueBubble(itemId) {
+    return document.getElementById(`bubble_${itemId}`) || document.querySelector(`.speech-bubble[data-card-id="${itemId}"]`);
+}
+
+function resetScrollDialogueCut(cut) {
+    if (!cut || !Array.isArray(cut.items)) return;
+    cut.items.forEach(item => {
+        if (item.type !== 'dialogue' || item.timingType !== 'scroll') return;
+        item.isShown = false;
+        const bubble = findDialogueBubble(item.id);
+        // 컷 이탈 시 prepareBubbleTyping 캐시도 함께 초기화:
+        // 재진입 시 동일 텍스트라도 span 재생성 및 타이핑 연출이 다시 실행되도록 보장
+        if (bubble) bubble.lastPreparedText = null;
+        setBubbleShownForScroll(bubble, false);
+    });
+}
+
+// [정밀 교정] 롱테이크 스크롤 대사 전용 애니메이션 트리거 함수
+// 일반 컷의 오리지널 bounce CSS 트랜지션 + 타이핑 연출을 상속하여 발동시킨다.
+function triggerScrollDialogueAnimation(bubble, item) {
+    if (!bubble) return;
+
+    // 1. 대사 텍스트 추출 (item 데이터 객체에서 직접 획득)
+    const text = item.text || '';
+
+    // 2. prepareBubbleTyping으로 .typing-wrapper span 구조 생성 (모두 opacity:0 상태로 준비)
+    prepareBubbleTyping(bubble, text);
+
+    // 3. prepareBubbleTyping 내부에서 transition:none + opacity:0 + .animate가 적용되므로,
+    //    한 프레임 뒤에 .animate → .show 클래스 교체하여 CSS bounce 트랜지션을 발동시킨다.
+    requestAnimationFrame(() => {
+        if (!bubble) return;
+        // transition을 복원하여 CSS cubic-bezier bounce 트랜지션이 살아있도록 보장
+        bubble.style.transition = '';
+        bubble.style.opacity = '';
+        const tailSvg = bubble.querySelector('.tail-svg');
+        const paths = bubble.querySelectorAll('.bubble-path');
+        if (tailSvg) tailSvg.style.transition = '';
+        if (paths.length > 0) paths.forEach(p => p.style.transition = '');
+
+        // .animate 제거 → .show 추가: CSS가 scale(0.6)→scale(1), opacity 0→1 bounce 트랜지션 실행
+        bubble.classList.remove('animate');
+        bubble.classList.add('show');
+        bubble.lastOpacity = '1';
+
+        // 4. 타이핑 span 순차 노출 애니메이션 (일반 컷 renderItemsFrame의 타이핑 로직과 동일한 방식)
+        const spans = bubble.querySelectorAll('.typing-wrapper span');
+        if (spans.length > 0) {
+            // 글자당 60ms 간격으로 순차 노출 (일반 컷 타이핑 연출과 동일한 생동감)
+            const typingDuration = Math.max(800, spans.length * 60);
+            const startTime = performance.now();
+            bubble.lastSpansToShow = 0;
+
+            function runTypingLoop() {
+                // 버블이 DOM에서 제거되었거나 숨겨진 경우 루프 중단
+                if (!bubble.isConnected || !bubble.classList.contains('show')) return;
+
+                const elapsed = performance.now() - startTime;
+                const progress = Math.min(1.0, elapsed / typingDuration);
+                const spansToShow = Math.floor(spans.length * progress);
+
+                if (bubble.lastSpansToShow !== spansToShow) {
+                    bubble.lastSpansToShow = spansToShow;
+                    for (let i = 0; i < spans.length; i++) {
+                        spans[i].style.opacity = (i < spansToShow) ? '1' : '0';
+                    }
+                }
+
+                if (progress < 1.0) {
+                    requestAnimationFrame(runTypingLoop);
+                }
+            }
+
+            requestAnimationFrame(runTypingLoop);
+        }
+    });
+}
+
+function updateScrollTriggeredDialogues(scrollTop, containerHeight) {
+    const triggerYInViewer = scrollTop + containerHeight * 0.5;
+
+    cuts.forEach(cut => {
+        const cutEl = document.getElementById(`viewerCut_${cut.id}`);
+        if (!cutEl || !cutEl.classList.contains('is-preview-long-take')) {
+            return;
+        }
+
+        const cutTop = cutEl.offsetTop;
+        const cutBottom = cutTop + (cutEl.scrollHeight || cutEl.clientHeight || containerHeight);
+        const isInsideLongTake = triggerYInViewer >= cutTop && triggerYInViewer <= cutBottom;
+
+        // [정밀 교정 1] 롱테이크 컷 물리 영역 이탈 시에만 일괄 리셋 (컷 인덱스 이탈 조건)
+        if (!isInsideLongTake) {
+            resetScrollDialogueCut(cut);
+            return;
+        }
+
+        // [정밀 교정 1] 롱테이크 컷 내부에서는 단방향(내려올 때만 트리거) 판정
+        // 한 번 isShown === true가 된 대사는 업스크롤해도 절대 숨기지 않음
+        (cut.items || []).forEach(item => {
+            if (item.type !== 'dialogue' || item.timingType !== 'scroll') return;
+
+            // 이미 노출된 대사는 어떤 스크롤 방향에서도 건드리지 않음 (업스크롤 보존)
+            if (item.isShown) return;
+
+            const triggerY = parseFloat(item.scrollY);
+            const relativeTriggerY = Number.isFinite(triggerY) ? triggerY : 0;
+            const absoluteTriggerY = cutTop + relativeTriggerY;
+
+            const shouldShow = triggerYInViewer >= absoluteTriggerY;
+
+            if (shouldShow) {
+                // [정밀 교정 2] 최초 트리거 순간: 오리지널 bounce + 타이핑 연출 엔진 상속 발동
+                item.isShown = true;
+                const bubble = findDialogueBubble(item.id);
+                triggerScrollDialogueAnimation(bubble, item);
+            }
+        });
+    });
+}
 
 // 60fps 留덉뒪???꾨젅???ㅼ?以꾨윭 (?ъ깮 ?곹깭???뚮쭔 臾댄븳 猷⑦봽 媛??
 function updateRealtimeTimeline(mySessionId) {
@@ -1203,10 +1360,32 @@ function buildPlayItemsQueue(cutId) {
     const activeSceneList = document.getElementById(`sceneList_${cutId}`);
 
     if (activeSceneList) {
-        // [1] ?몄쭛湲?紐⑤뱶: DOM 移대뱶瑜?吏곸젒 湲곸뼱???ㅼ떆媛??곗텧 ??援ъ텞
+        // [롱테이크 원천 차단] timingType 주입 타이밍과 무관하게 DOM 클래스를 직접 보고
+        // 롱테이크 컷의 모든 대사를 시간 기반 큐에서 원천 제외한다.
+        const _cutDomEl = document.getElementById(`viewerCut_${cutId}`);
+        const _isCutLongTake = _cutDomEl && _cutDomEl.classList.contains('is-preview-long-take');
+
+        // [1] DOM 경로: 카드를 직접 순회하여 재생 큐 구성
         const dialogueCards = activeSceneList.querySelectorAll('.dialogue-item');
         dialogueCards.forEach(card => {
             const id = card.dataset.id;
+            const timingType = card.dataset.timingType || 'time';
+
+            // 롱테이크 컷이거나 scroll 타입이면 큐 제외 + 말풍선 숨김 + timingType 동기화
+            if (_isCutLongTake || timingType === 'scroll') {
+                if (cut && cut.items) {
+                    const item = cut.items.find(i => i.id === id);
+                    if (item) { item.isShown = false; item.timingType = 'scroll'; }
+                }
+                card.dataset.timingType = 'scroll';
+                const bubble = card.bubbleDOM || document.querySelector(`.speech-bubble[data-card-id="${id}"]`);
+                if (bubble) {
+                    bubble.dataset.timingType = 'scroll';
+                    bubble.lastPreparedText = null;
+                    setBubbleShownForScroll(bubble, false);
+                }
+                return;
+            }
             const charName = card.querySelector('.diag-char-name').value;
             const text = card.querySelector('.diag-text').value;
             const startSec = parseFloat(card.querySelector('.diag-start').value) || 0;
@@ -1267,6 +1446,10 @@ function buildPlayItemsQueue(cutId) {
         // [2] ?고???酉곗뼱 紐⑤뱶: cuts ?좎뼵 諛곗뿴(data.json 濡쒕뱶 ?곗씠?????듯빐 ??援ъ텞
         if (cut.items && cut.items.length > 0) {
             cut.items.forEach(item => {
+                if (item.type === 'dialogue' && item.timingType === 'scroll') {
+                    item.isShown = false;
+                    return;
+                }
                 const startSec = parseFloat(item.start) || 0;
                 const duration = parseFloat(item.duration) || 2.0;
                 let bubble = null;
@@ -1363,8 +1546,11 @@ const dialogueSchema = {
     charColor: ['charColor', 'color', 'bubbleColor'],
     text: ['text', 'content', 'dialogueText'],
     audioUrl: ['audioUrl', 'audioPath', 'soundUrl', 'audio'],
+    timingType: ['timingType'],
     start: ['start', 'startTime', 'startSec'],
     duration: ['duration', 'playTime', 'length'],
+    scrollY: ['scrollY', 'triggerY', 'scrollTriggerY'],
+    isShown: ['isShown'],
     x: ['x', 'posX', 'left'],
     y: ['y', 'posY', 'top'],
     baseAngle: ['baseAngle', 'angle'],
@@ -1482,10 +1668,14 @@ function normalizeAndMapProjectData(data) {
                 mappedCut.items = c.items.map(item => {
                     const itemType = item.type || "";
                     if (itemType === 'dialogue') {
-                        return {
+                        const mappedDialogue = {
                             ...mapObjectProperties(item, dialogueSchema),
                             type: 'dialogue'
                         };
+                        mappedDialogue.timingType = mappedDialogue.timingType || 'time';
+                        mappedDialogue.scrollY = parseFloat(mappedDialogue.scrollY) || 0.0;
+                        mappedDialogue.isShown = false;
+                        return mappedDialogue;
                     } else if (itemType === 'sfx') {
                         return {
                             ...mapObjectProperties(item, sfxSchema),
@@ -1528,9 +1718,12 @@ window.getContrastYIQ = getContrastYIQ;
 // 留먰뭾??DOM ?숈쟻 ?앹꽦湲?(Swap-in ??
 function createBubbleDOM(cutId, item) {
     const bubble = document.createElement('div');
-    bubble.className = 'speech-bubble show';
+    const isScrollDialogue = item.timingType === 'scroll';
+    bubble.className = isScrollDialogue ? 'speech-bubble animate' : 'speech-bubble show';
     bubble.id = `bubble_${item.id}`;
     bubble.dataset.cardId = item.id;
+    bubble.dataset.timingType = item.timingType || 'time';
+    bubble.style.opacity = isScrollDialogue ? '0' : '';
     bubble.style.left = `${item.x}%`;
     bubble.style.top = `${item.y}%`;
     bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
@@ -1587,9 +1780,12 @@ window.getContrastYIQ = getContrastYIQ;
 // 말풍선 DOM 동적 생성기 (Swap-in 시)
 function createBubbleDOM(cutId, item) {
     const bubble = document.createElement('div');
-    bubble.className = 'speech-bubble show';
+    const isScrollDialogue = item.timingType === 'scroll';
+    bubble.className = isScrollDialogue ? 'speech-bubble animate' : 'speech-bubble show';
     bubble.id = `bubble_${item.id}`;
     bubble.dataset.cardId = item.id;
+    bubble.dataset.timingType = item.timingType || 'time';
+    bubble.style.opacity = isScrollDialogue ? '0' : '';
     bubble.style.left = `${item.x}%`;
     bubble.style.top = `${item.y}%`;
     bubble.style.setProperty('--bubble-color', item.charColor || '#ffffff');
@@ -1767,6 +1963,24 @@ function buildViewerLayersFallback(cutItem, c) {
         } else {
             el = document.createElement('div');
             el.style.backgroundImage = `url(${normalizeMediaPath(layerObj.url)})`;
+            const longTakeProbe = new Image();
+            longTakeProbe.onload = () => {
+                const containerHeight = (viewerScrollContainer && viewerScrollContainer.clientHeight) || window.innerHeight || 640;
+                if (longTakeProbe.naturalHeight >= containerHeight * 1.1) {
+                    cutItem.classList.add('is-preview-long-take');
+                    const cutWidth = cutItem.clientWidth || viewerScrollContainer.clientWidth || longTakeProbe.naturalWidth || 1;
+                    const scaledHeight = longTakeProbe.naturalWidth
+                        ? (longTakeProbe.naturalHeight * cutWidth) / longTakeProbe.naturalWidth
+                        : longTakeProbe.naturalHeight;
+                    cutItem.style.height = `${Math.max(containerHeight, scaledHeight)}px`;
+                    cutItem.style.overflow = 'hidden';
+                    cutItem.querySelectorAll('.cut-layer, .cut-bg-image').forEach(layer => {
+                        layer.style.backgroundSize = '100% auto';
+                        layer.style.backgroundPosition = 'top center';
+                    });
+                }
+            };
+            longTakeProbe.src = normalizeMediaPath(layerObj.url);
 
             // 첫 번째 컷(Index 1) 이미지 로드 완료 감시 및 2초 강제 타임아웃
             if (c.index === 1) {
